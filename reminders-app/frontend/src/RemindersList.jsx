@@ -75,6 +75,7 @@ export default function RemindersList({ user, reminders, error, onLogout, onRefr
       </header>
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
         مرحباً، {user?.name || user?.email}. التنبيهات تظهر مكتوبة ويُقرأ نصها بصوت افتراضي عند وقت التذكير.
+        جميع التنبيهات تبقى في القائمة ولا تُحذف تلقائياً؛ يمكنك حذف أي تنبيه يدوياً بزر «حذف».
         لو لم يظهر تنبيه: اسمح بالإشعارات، أو اضغط «تحديث» بعد وقت التنبيه. لو استمرت المشكلة اضغط «مسح سجل التنبيهات» ثم حدّث.
         <span style={{ display: 'block', marginTop: 6, fontSize: 11, opacity: 0.7 }}>نسخة واجهة: 2</span>
       </p>

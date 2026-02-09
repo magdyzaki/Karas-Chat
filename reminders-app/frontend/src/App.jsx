@@ -233,7 +233,9 @@ function App() {
     setFiredIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
-      localStorage.setItem('reminders_fired', JSON.stringify([...next]));
+      try {
+        localStorage.setItem('reminders_fired', JSON.stringify([...next]));
+      } catch (_) {}
       return next;
     });
   };
