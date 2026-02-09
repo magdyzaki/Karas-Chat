@@ -1,0 +1,443 @@
+import sqlite3
+import os
+from datetime import datetime
+
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database", "efm.db")
+
+
+# =========================
+# Connection
+# =========================
+def get_connection():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    return sqlite3.connect(DB_PATH)
+
+
+# =========================
+# Init & Migration
+# =========================
+def init_db():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # ===== Clients Table =====
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL,
+        country TEXT,
+        contact_person TEXT,
+        email TEXT,
+        phone TEXT,
+        website TEXT,
+        date_added TEXT,
+        status TEXT,
+        seriousness_score INTEGER DEFAULT 0,
+        classification TEXT,
+        is_focus INTEGER DEFAULT 0
+    )
+    """)
+
+    # ===== Messages Table =====
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER,
+        message_date TEXT,
+        message_type TEXT,
+        channel TEXT,
+        client_response TEXT,
+        notes TEXT,
+        score_effect INTEGER DEFAULT 0,
+        FOREIGN KEY (client_id) REFERENCES clients(id)
+    )
+    """)
+
+    # ===== Requests Table =====
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER,
+        client_email TEXT,
+        request_type TEXT,
+        extracted_text TEXT,
+        notes TEXT,
+        status TEXT DEFAULT 'open',
+        created_at TEXT,
+        FOREIGN KEY (client_id) REFERENCES clients(id)
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def ensure_focus_column():
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE clients ADD COLUMN is_focus INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    conn.commit()
+    conn.close()
+
+
+def ensure_requests_email_column():
+    """
+    Safe migration: add client_email to requests if missing
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE requests ADD COLUMN client_email TEXT")
+    except sqlite3.OperationalError:
+        pass
+    conn.commit()
+    conn.close()
+
+
+# =========================
+# Client Operations
+# =========================
+def add_client(data: dict):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO clients (
+        company_name, country, contact_person,
+        email, phone, website,
+        date_added, status,
+        seriousness_score, classification, is_focus
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["company_name"],
+        data.get("country"),
+        data.get("contact_person"),
+        data.get("email"),
+        data.get("phone"),
+        data.get("website"),
+        data["date_added"],
+        data["status"],
+        data["seriousness_score"],
+        data["classification"],
+        data.get("is_focus", 0)
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def update_client(client_id: int, data: dict):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    UPDATE clients SET
+        company_name = ?,
+        country = ?,
+        contact_person = ?,
+        email = ?,
+        phone = ?,
+        website = ?,
+        status = ?,
+        seriousness_score = ?,
+        classification = ?,
+        is_focus = ?
+    WHERE id = ?
+    """, (
+        data["company_name"],
+        data.get("country"),
+        data.get("contact_person"),
+        data.get("email"),
+        data.get("phone"),
+        data.get("website"),
+        data.get("status"),
+        data.get("seriousness_score"),
+        data.get("classification"),
+        data.get("is_focus", 0),
+        client_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def delete_client(client_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM messages WHERE client_id = ?", (client_id,))
+    cur.execute("DELETE FROM requests WHERE client_id = ?", (client_id,))
+    cur.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_all_clients():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        id,
+        company_name,
+        country,
+        contact_person,
+        email,
+        phone,
+        website,
+        date_added,
+        status,
+        seriousness_score,
+        classification,
+        is_focus
+    FROM clients
+    ORDER BY is_focus DESC, seriousness_score DESC
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def get_client_by_id(client_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        id,
+        company_name,
+        country,
+        contact_person,
+        email,
+        phone,
+        website,
+        date_added,
+        status,
+        seriousness_score,
+        classification,
+        is_focus
+    FROM clients
+    WHERE id = ?
+    """, (client_id,))
+
+    row = cur.fetchone()
+    conn.close()
+    return row
+
+
+# =========================
+# Auto-Link Helpers
+# =========================
+def resolve_client_id_by_email(email: str):
+    if not email:
+        return None
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id FROM clients WHERE LOWER(email) = ?",
+        (email.lower(),)
+    )
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+def find_client_by_email(email: str):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT id, company_name, email
+    FROM clients
+    WHERE LOWER(email) = ?
+    """, (email.lower(),))
+
+    row = cur.fetchone()
+    conn.close()
+    return row
+
+
+def find_client_by_domain(domain: str):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT id, company_name, email
+    FROM clients
+    WHERE LOWER(email) LIKE ?
+    """, (f"%@{domain.lower()}",))
+
+    row = cur.fetchone()
+    conn.close()
+    return row
+
+
+def get_focus_emails():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT email FROM clients WHERE is_focus = 1")
+    emails = [r[0].lower() for r in cur.fetchall()]
+    conn.close()
+    return emails
+
+
+# =========================
+# Messages Operations
+# =========================
+def add_message(data: dict):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO messages (
+        client_id, message_date,
+        message_type, channel,
+        client_response, notes,
+        score_effect
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["client_id"],
+        data["message_date"],
+        data["message_type"],
+        data["channel"],
+        data.get("client_response"),
+        data.get("notes"),
+        data["score_effect"]
+    ))
+
+    cur.execute("""
+    UPDATE clients
+    SET seriousness_score = seriousness_score + ?
+    WHERE id = ?
+    """, (data["score_effect"], data["client_id"]))
+
+    conn.commit()
+    conn.close()
+
+
+def get_client_messages(client_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        message_date,
+        message_type,
+        channel,
+        client_response,
+        notes,
+        score_effect
+    FROM messages
+    WHERE client_id = ?
+    ORDER BY message_date ASC
+    """, (client_id,))
+
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+# =========================
+# Follow-Up Logic
+# =========================
+def get_clients_needing_followup():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        c.id,
+        c.company_name,
+        c.status,
+        c.classification,
+        MAX(m.message_date) as last_message_date
+    FROM clients c
+    LEFT JOIN messages m ON c.id = m.client_id
+    GROUP BY c.id
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    today = datetime.now()
+    due_clients = []
+
+    from core.models import followup_days
+
+    for row in rows:
+        client_id, company, status, classification, last_date = row
+
+        if not last_date:
+            days_passed = 999
+        else:
+            last_dt = datetime.strptime(last_date, "%d/%m/%Y")
+            days_passed = (today - last_dt).days
+
+        wait_days = followup_days(status if status else classification)
+
+        if days_passed >= wait_days:
+            due_clients.append(company)
+
+    return due_clients
+
+
+# =========================
+# Requests Operations
+# =========================
+def save_request(
+    client_email: str,
+    request_type: str,
+    extracted_text: str,
+    notes: str = ""
+):
+    ensure_requests_email_column()
+
+    client_id = resolve_client_id_by_email(client_email)
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO requests (
+        client_id,
+        client_email,
+        request_type,
+        extracted_text,
+        notes,
+        status,
+        created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        client_id,
+        client_email,
+        request_type,
+        extracted_text,
+        notes,
+        "open",
+        datetime.now().strftime("%d/%m/%Y %H:%M")
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def update_request_client(request_id: int, client_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE requests
+        SET client_id = ?
+        WHERE id = ?
+    """, (client_id, request_id))
+
+    conn.commit()
+    conn.close()

@@ -1,0 +1,13 @@
+python -m scripts.buyers_intelligence --batch batch_products_299.json --out ./output --serpapi-key bed859299fd88350b1788969d36d0514455860a39c729ae4ff9a9d1beb67a005
+
+python -m scripts.buyers_intelligence_max --batch batch_products_299.json --out ./output --serpapi-key bed859299fd88350b1788969d36d0514455860a39c729ae4ff9a9d1beb67a005 --workers 6 --serp-num 100
+
+python -m scripts.buyers_intelligence_max --batch batch_test10.json --out ./output --serpapi-key bed859299fd88350b1788969d36d0514455860a39c729ae4ff9a9d1beb67a005 --workers 4 --serp-num 50
+
+
+e7bf2b70a31230ee049fe79a1e14bbcfee1223c9
+----------------------------------------------------------------------------------------------------------
+
+جديد
+
+6c7060eedbfd3e7fc0939531ff67218db56ebfb8774655a1b8c98a51eac08400

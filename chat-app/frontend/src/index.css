@@ -1,0 +1,13 @@
+* { box-sizing: border-box; }
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: rgba(255,255,255,0.1);
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --primary: #238636;
+  --primary-hover: #2ea043;
+}
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+input, textarea, button { font-family: inherit; }
+a { color: var(--primary); }

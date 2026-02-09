@@ -1,0 +1,318 @@
+import sqlite3
+import os
+from datetime import datetime
+
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database", "efm.db")
+
+
+def get_connection():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    return sqlite3.connect(DB_PATH)
+
+
+def init_db():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # ===== Clients Table =====
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL,
+        country TEXT,
+        contact_person TEXT,
+        email TEXT,
+        phone TEXT,
+        website TEXT,
+        date_added TEXT,
+        status TEXT,
+        seriousness_score INTEGER DEFAULT 0,
+        classification TEXT
+    )
+    """)
+
+    # ===== Messages Table =====
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER,
+        message_date TEXT,
+        message_type TEXT,
+        channel TEXT,
+        client_response TEXT,
+        notes TEXT,
+        score_effect INTEGER DEFAULT 0,
+        FOREIGN KEY (client_id) REFERENCES clients(id)
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# =========================
+# Client Operations
+# =========================
+def add_client(data: dict):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO clients (
+        company_name, country, contact_person,
+        email, phone, website,
+        date_added, status,
+        seriousness_score, classification
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["company_name"],
+        data.get("country"),
+        data.get("contact_person"),
+        data.get("email"),
+        data.get("phone"),
+        data.get("website"),
+        data["date_added"],
+        data["status"],
+        data["seriousness_score"],
+        data["classification"]
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def get_all_clients():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        id,
+        company_name,
+        country,
+        contact_person,
+        email,
+        phone,
+        website,
+        date_added,
+        status,
+        seriousness_score,
+        classification
+    FROM clients
+    ORDER BY seriousness_score DESC
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+# =========================
+# 🔗 Auto-Link Helpers
+# =========================
+def find_client_by_email(email: str):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT id, company_name, email
+    FROM clients
+    WHERE LOWER(email) = ?
+    """, (email.lower(),))
+
+    row = cur.fetchone()
+    conn.close()
+    return row
+
+
+def find_client_by_domain(domain: str):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT id, company_name, email
+    FROM clients
+    WHERE LOWER(email) LIKE ?
+    """, (f"%@{domain.lower()}",))
+
+    row = cur.fetchone()
+    conn.close()
+    return row
+
+
+# =========================
+# 🗑 Delete / ✏️ Update Client (NEW)
+# =========================
+def delete_client(client_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # delete messages first
+    cur.execute("DELETE FROM messages WHERE client_id = ?", (client_id,))
+    # delete client
+    cur.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+
+    conn.commit()
+    conn.close()
+
+
+def update_client(client_id: int, data: dict):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    UPDATE clients SET
+        company_name = ?,
+        country = ?,
+        contact_person = ?,
+        email = ?,
+        phone = ?,
+        website = ?,
+        status = ?,
+        seriousness_score = ?,
+        classification = ?
+    WHERE id = ?
+    """, (
+        data["company_name"],
+        data.get("country"),
+        data.get("contact_person"),
+        data.get("email"),
+        data.get("phone"),
+        data.get("website"),
+        data.get("status"),
+        data.get("seriousness_score"),
+        data.get("classification"),
+        client_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+# =========================
+# Messages Operations
+# =========================
+def add_message(data: dict):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO messages (
+        client_id, message_date,
+        message_type, channel,
+        client_response, notes,
+        score_effect
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["client_id"],
+        data["message_date"],
+        data["message_type"],
+        data["channel"],
+        data.get("client_response"),
+        data.get("notes"),
+        data["score_effect"]
+    ))
+
+    # Update seriousness score
+    cur.execute("""
+    UPDATE clients
+    SET seriousness_score = seriousness_score + ?
+    WHERE id = ?
+    """, (data["score_effect"], data["client_id"]))
+
+    conn.commit()
+    conn.close()
+
+
+def get_client_messages(client_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        message_date,
+        message_type,
+        channel,
+        client_response,
+        notes,
+        score_effect
+    FROM messages
+    WHERE client_id = ?
+    ORDER BY message_date ASC
+    """, (client_id,))
+
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+# =========================
+# Follow-Up Logic
+# =========================
+def get_clients_needing_followup():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        c.id,
+        c.company_name,
+        c.status,
+        c.classification,
+        MAX(m.message_date) as last_message_date
+    FROM clients c
+    LEFT JOIN messages m ON c.id = m.client_id
+    GROUP BY c.id
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    today = datetime.now()
+    due_clients = []
+
+    from core.models import followup_days
+
+    for row in rows:
+        client_id, company, status, classification, last_date = row
+
+        if not last_date:
+            days_passed = 999
+        else:
+            last_dt = datetime.strptime(last_date, "%d/%m/%Y")
+            days_passed = (today - last_dt).days
+
+        wait_days = followup_days(status if status else classification)
+
+        if days_passed >= wait_days:
+            due_clients.append(company)
+
+    return due_clients
+
+def get_client_by_id(client_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        id,
+        company_name,
+        country,
+        contact_person,
+        email,
+        phone,
+        website,
+        date_added,
+        status,
+        seriousness_score,
+        classification
+    FROM clients
+    WHERE id = ?
+    """, (client_id,))
+
+    row = cur.fetchone()
+    conn.close()
+    return row

@@ -1,0 +1,389 @@
+# pages/PurchasesPage.py
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,
+    QTableWidget, QTableWidgetItem, QLineEdit, QMessageBox, QHeaderView
+)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
+import sqlite3, os
+from datetime import datetime
+from pages.AddProductDialog import AddProductDialog
+
+DB = os.path.join(os.path.dirname(__file__), "..", "database", "crm.db")
+
+
+class PurchasesPage(QWidget):
+
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("background-color:#FFFBEA;")
+        self.setFont(QFont("Amiri", 10))
+
+        self.current_purchase_id = None
+        self._suppress_cell_change = False
+
+        self._ensure_db()
+        self.init_ui()
+        self.load_suppliers()
+        self.load_products()
+        self.load_purchases()
+
+    # ----------------------------------------------------------------------
+    # DB CONNECTION
+    # ----------------------------------------------------------------------
+    def db_conn(self):
+        return sqlite3.connect(DB)
+
+    def _ensure_db(self):
+        conn = self.db_conn()
+        cur = conn.cursor()
+
+        # جدول الفواتير
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS purchases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier TEXT,
+                invoice_no TEXT,
+                date TEXT,
+                subtotal REAL,
+                total REAL,
+                note TEXT,
+                created_at TEXT
+            )
+        """)
+
+        # جدول العناصر
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS purchase_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                purchase_id INTEGER,
+                product_code TEXT,
+                product_name TEXT,
+                unit TEXT,
+                quantity REAL,
+                unit_price REAL,
+                line_total REAL
+            )
+        """)
+
+        conn.commit()
+        conn.close()
+
+    # ----------------------------------------------------------------------
+    # UI
+    # ----------------------------------------------------------------------
+    def init_ui(self):
+        layout = QVBoxLayout()
+
+        title = QLabel("📥 صفحة المشتريات")
+        title.setFont(QFont("Amiri", 18, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        # الصف العلوي
+        top = QHBoxLayout()
+
+        top.addWidget(QLabel("المورد:"))
+        self.supplier_combo = QComboBox()
+        top.addWidget(self.supplier_combo)
+
+        top.addWidget(QLabel("رقم الفاتورة:"))
+        self.invoice_no_input = QLineEdit()
+        top.addWidget(self.invoice_no_input)
+
+        top.addWidget(QLabel("التاريخ:"))
+        self.date_input = QLineEdit(datetime.now().strftime("%Y-%m-%d"))
+        top.addWidget(self.date_input)
+
+        self.add_product_btn = QPushButton("➕ إضافة منتج")
+        self.add_product_btn.setStyleSheet("background:#6A1B9A;color:white;")
+        self.add_product_btn.clicked.connect(self.open_add_product)
+        top.addWidget(self.add_product_btn)
+
+        layout.addLayout(top)
+
+        # جدول العناصر
+        self.items_table = QTableWidget(0, 7)
+        self.items_table.setHorizontalHeaderLabels(
+            ["كود", "المنتج", "الوحدة", "الكمية", "السعر", "الإجمالي", "حذف"]
+        )
+        self.items_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        # ربط التحديث التلقائي
+        self.items_table.cellChanged.connect(self.on_cell_changed)
+
+        layout.addWidget(self.items_table)
+
+        # أزرار تحت الجدول
+        buttons = QHBoxLayout()
+
+        add_row_btn = QPushButton("＋ أضف سطر")
+        add_row_btn.setStyleSheet("background:#4CAF50;color:white;")
+        add_row_btn.clicked.connect(self.add_item_row)
+        buttons.addWidget(add_row_btn)
+
+        layout.addLayout(buttons)
+
+        # إجماليات
+        totals_row = QHBoxLayout()
+
+        totals_panel = QVBoxLayout()
+        totals_panel.addWidget(QLabel("Subtotal:"))
+        self.subtotal_label = QLabel("0.00")
+        totals_panel.addWidget(self.subtotal_label)
+
+        totals_panel.addWidget(QLabel("TOTAL:"))
+        self.total_label = QLabel("0.00")
+        totals_panel.addWidget(self.total_label)
+
+        totals_row.addLayout(totals_panel)
+
+        # أزرار الحفظ
+        save_box = QVBoxLayout()
+
+        save_btn = QPushButton("💾 حفظ الفاتورة")
+        save_btn.setStyleSheet("background:#1976D2;color:white;")
+        save_btn.clicked.connect(self.save_purchase)
+        save_box.addWidget(save_btn)
+
+        delete_btn = QPushButton("🗑 حذف الفاتورة")
+        delete_btn.setStyleSheet("background:#E53935;color:white;")
+        delete_btn.clicked.connect(self.delete_purchase)
+        save_box.addWidget(delete_btn)
+
+        totals_row.addLayout(save_box)
+        layout.addLayout(totals_row)
+
+        # جدول الفواتير
+        layout.addWidget(QLabel("📄 سجل المشتريات"))
+
+        self.purchases_table = QTableWidget(0, 8)
+        self.purchases_table.setHorizontalHeaderLabels([
+            "ID", "المورد", "رقم الفاتورة", "التاريخ",
+            "الإجمالي", "ملاحظة", "تاريخ الإدخال", "عرض"
+        ])
+        self.purchases_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.purchases_table)
+
+        self.setLayout(layout)
+
+    # ----------------------------------------------------------------------
+    # إضافة منتج جديد + وضعه مباشرة في الجدول
+    # ----------------------------------------------------------------------
+    def open_add_product(self):
+        dlg = AddProductDialog()
+        if dlg.exec_():
+            self.load_products()
+
+            # إضافة آخر منتج للجدول
+            if self.products:
+                code, name, unit, buy_price = self.products[-1]
+
+                r = self.items_table.rowCount()
+                self.items_table.insertRow(r)
+
+                self.items_table.setItem(r, 0, QTableWidgetItem(code))
+                self.items_table.setItem(r, 1, QTableWidgetItem(name))
+                self.items_table.setItem(r, 2, QTableWidgetItem(unit))
+                self.items_table.setItem(r, 3, QTableWidgetItem("0"))
+                self.items_table.setItem(r, 4, QTableWidgetItem(str(buy_price)))
+                self.items_table.setItem(r, 5, QTableWidgetItem("0.00"))
+
+                # زر الحذف
+                btn = QPushButton("✖")
+                btn.setStyleSheet("background:#C62828;color:white;")
+                btn.clicked.connect(lambda _, row=r: self.remove_row(row))
+                self.items_table.setCellWidget(r, 6, btn)
+
+                QMessageBox.information(self, "✔", "تمت إضافة المنتج للجدول.")
+
+    # ----------------------------------------------------------------------
+    # تحميل الموردين
+    # ----------------------------------------------------------------------
+    def load_suppliers(self):
+        self.supplier_combo.clear()
+        conn = self.db_conn()
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS suppliers (id INTEGER, name TEXT)")
+        cur.execute("SELECT name FROM suppliers")
+        rows = cur.fetchall()
+        conn.close()
+
+        if rows:
+            for r in rows:
+                self.supplier_combo.addItem(r[0])
+        else:
+            self.supplier_combo.addItem("لا يوجد موردين")
+
+    # ----------------------------------------------------------------------
+    # تحميل المنتجات
+    # ----------------------------------------------------------------------
+    def load_products(self):
+        try:
+            conn = self.db_conn()
+            cur = conn.cursor()
+            cur.execute("SELECT code, name, unit, buy_price FROM products ORDER BY id")
+            self.products = cur.fetchall()
+            conn.close()
+        except:
+            self.products = []
+
+    # ----------------------------------------------------------------------
+    # تحديث تلقائي عند تغيير الكمية أو السعر
+    # ----------------------------------------------------------------------
+    def on_cell_changed(self, row, column):
+        if self._suppress_cell_change:
+            return
+
+        if column not in (3, 4):  # كمية أو سعر
+            return
+
+        try:
+            self._suppress_cell_change = True
+
+            qty = float(self.items_table.item(row, 3).text())
+            price = float(self.items_table.item(row, 4).text())
+
+            total = qty * price
+
+            total_item = QTableWidgetItem(f"{total:.2f}")
+            total_item.setFlags(total_item.flags() & ~Qt.ItemIsEditable)
+            total_item.setTextAlignment(Qt.AlignCenter)
+
+            self.items_table.setItem(row, 5, total_item)
+
+        except:
+            pass
+        finally:
+            self._suppress_cell_change = False
+
+        self.update_totals()
+
+    # ----------------------------------------------------------------------
+    # إضافة سطر يدوي
+    # ----------------------------------------------------------------------
+    def add_item_row(self):
+        r = self.items_table.rowCount()
+        self.items_table.insertRow(r)
+
+        for c in range(7):
+            if c == 6:
+                btn = QPushButton("✖")
+                btn.setStyleSheet("background:#C62828;color:white;")
+                btn.clicked.connect(lambda _, row=r: self.remove_row(row))
+                self.items_table.setCellWidget(r, 6, btn)
+            else:
+                item = QTableWidgetItem("0" if c in (3, 4) else "")
+                item.setTextAlignment(Qt.AlignCenter)
+                self.items_table.setItem(r, c, item)
+
+    # ----------------------------------------------------------------------
+    # حذف سطر
+    # ----------------------------------------------------------------------
+    def remove_row(self, row):
+        self.items_table.removeRow(row)
+        self.update_totals()
+
+    # ----------------------------------------------------------------------
+    # حساب الإجماليات
+    # ----------------------------------------------------------------------
+    def update_totals(self):
+        subtotal = 0
+
+        for r in range(self.items_table.rowCount()):
+            try:
+                total = float(self.items_table.item(r, 5).text())
+                subtotal += total
+            except:
+                pass
+
+        self.subtotal_label.setText(f"{subtotal:.2f}")
+        self.total_label.setText(f"{subtotal:.2f}")
+
+    # ----------------------------------------------------------------------
+    # حفظ الفاتورة
+    # ----------------------------------------------------------------------
+    def save_purchase(self):
+        supplier = self.supplier_combo.currentText()
+        invoice_no = self.invoice_no_input.text()
+        date = self.date_input.text()
+        note = ""
+
+        subtotal = float(self.subtotal_label.text())
+        total = subtotal
+
+        conn = self.db_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO purchases (supplier, invoice_no, date, subtotal, total, note, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (supplier, invoice_no, date, subtotal, total, note, datetime.now().isoformat()))
+
+        purchase_id = cur.lastrowid
+
+        for r in range(self.items_table.rowCount()):
+            code = self.items_table.item(r, 0).text()
+            name = self.items_table.item(r, 1).text()
+            unit = self.items_table.item(r, 2).text()
+            qty = float(self.items_table.item(r, 3).text())
+            price = float(self.items_table.item(r, 4).text())
+            total = qty * price
+
+            cur.execute("""
+                INSERT INTO purchase_items (purchase_id, product_code, product_name, unit, quantity, unit_price, line_total)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (purchase_id, code, name, unit, qty, price, total))
+
+        conn.commit()
+        conn.close()
+
+        QMessageBox.information(self, "✔", "تم حفظ الفاتورة")
+        self.load_purchases()
+
+    # ----------------------------------------------------------------------
+    # تحميل الفواتير
+    # ----------------------------------------------------------------------
+    def load_purchases(self):
+        self.purchases_table.setRowCount(0)
+
+        conn = self.db_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT id, supplier, invoice_no, date, total, note, created_at FROM purchases ORDER BY id DESC")
+        rows = cur.fetchall()
+        conn.close()
+
+        for row_data in rows:
+            r = self.purchases_table.rowCount()
+            self.purchases_table.insertRow(r)
+
+            for c, val in enumerate(row_data):
+                item = QTableWidgetItem(str(val))
+                item.setTextAlignment(Qt.AlignCenter)
+                self.purchases_table.setItem(r, c, item)
+
+            btn = QPushButton("عرض")
+            btn.setStyleSheet("background:#1E88E5;color:white;")
+            self.purchases_table.setCellWidget(r, 7, btn)
+
+    # ----------------------------------------------------------------------
+    # حذف فاتورة
+    # ----------------------------------------------------------------------
+    def delete_purchase(self):
+        items = self.purchases_table.selectedItems()
+        if not items:
+            QMessageBox.warning(self, "⚠", "اختر فاتورة أولاً")
+            return
+
+        row = items[0].row()
+        pid = self.purchases_table.item(row, 0).text()
+
+        conn = self.db_conn()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM purchase_items WHERE purchase_id=?", (pid,))
+        cur.execute("DELETE FROM purchases WHERE id=?", (pid,))
+        conn.commit()
+        conn.close()
+
+        QMessageBox.information(self, "✔", "تم حذف الفاتورة")
+        self.load_purchases()

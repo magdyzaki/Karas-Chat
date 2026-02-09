@@ -1,0 +1,8 @@
+{
+  "auto_backup_enabled": false,
+  "backup_frequency": "daily",
+  "backup_time": "02:00",
+  "keep_backups": 30,
+  "backup_on_startup": true,
+  "last_backup": "2026-02-03T10:47:15.857617"
+}

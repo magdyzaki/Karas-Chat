@@ -1,0 +1,34 @@
+{
+  "dashboard": {
+    "colors": {
+      "total_clients": "#4ECDC4",
+      "serious_clients": "#FF6B6B",
+      "potential_clients": "#FFD93D",
+      "focus_clients": "#95E1D3",
+      "total_messages": "#A8E6CF",
+      "pending_requests": "#FFB347",
+      "pending_tasks": "#87CEEB",
+      "active_deals": "#DDA0DD"
+    },
+    "show_actions": true,
+    "actions_max_height": 95
+  },
+  "notifications": {
+    "enabled": true,
+    "check_interval": 300,
+    "followup_clients": true,
+    "pending_requests": true,
+    "pending_tasks": true,
+    "deals_closing": true
+  },
+  "ui": {
+    "language": "ar",
+    "theme": "light",
+    "font_size": 10
+  },
+  "general": {
+    "auto_backup": true,
+    "backup_frequency": "daily",
+    "backup_time": "02:00"
+  }
+}

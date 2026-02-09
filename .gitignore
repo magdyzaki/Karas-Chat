@@ -1,0 +1,48 @@
+# تبعيات وجاهز للبناء
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-ssr/
+*.local
+
+# بايثون
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+.venv/
+venv/
+env/
+
+# قواعد بيانات ونسخ احتياطية (ثقيلة)
+backups/
+*.db
+*.sqlite
+*.sqlite3
+
+# ملفات بيئة (سرية)
+.env
+.env.*
+!.env.example
+
+# رفع ملفات الشات (تُنشأ على السيرفر)
+chat-app/backend/uploads/*
+!chat-app/backend/uploads/.gitkeep
+
+# نسخة كربون من المشروع (اختياري — لو حابب ترفعها احذف السطرين)
+reminders-app - Copy/
+
+# نظام وتحرير
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
