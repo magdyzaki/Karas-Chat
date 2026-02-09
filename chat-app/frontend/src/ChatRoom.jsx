@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import * as api from './api';
 
 const styles = {
@@ -23,30 +23,31 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [fileError, setFileError] = useState('');
+  const [optimisticVersion, setOptimisticVersion] = useState(0);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const optimisticRef = useRef([]);
 
   useEffect(() => {
     if (!conversation?.id) return;
+    optimisticRef.current = [];
     setLoading(true);
     api.getMessages(conversation.id).then((list) => {
-      setMessages((prev) => {
-        const temps = prev.filter((m) => m.id && String(m.id).startsWith('temp-'));
-        return temps.length ? [...list, ...temps] : list;
-      });
+      const safeList = Array.isArray(list) ? list : [];
+      setMessages(safeList);
       setLoading(false);
     }).catch(() => {
       setLoading(false);
-      setMessages((prev) => prev.filter((m) => m.id && String(m.id).startsWith('temp-'))); // إبقاء المؤقتة فقط
     });
     if (socket) {
       socket.emit('join_conversation', conversation.id);
       const onNew = (msg) => {
         if (msg.conversation_id !== conversation.id) return;
-        setMessages((prev) => {
-          const withoutTemp = prev.filter((m) => !(m.id && String(m.id).startsWith('temp-') && m.content === msg.content && m.sender_id === msg.sender_id && m.type === msg.type));
-          return [...withoutTemp, msg];
-        });
+        optimisticRef.current = optimisticRef.current.filter(
+          (o) => !(o.content === msg.content && o.sender_id === msg.sender_id && o.type === msg.type)
+        );
+        setOptimisticVersion((v) => v + 1);
+        setMessages((prev) => [...prev, msg]);
       };
       socket.on('new_message', onNew);
       return () => {
@@ -56,21 +57,33 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
     }
   }, [conversation?.id, socket]);
 
+  const displayMessages = useMemo(() => {
+    const fromServer = messages || [];
+    const pending = optimisticRef.current || [];
+    const serverIds = new Set(fromServer.map((m) => m.id));
+    const extra = pending.filter((p) => !serverIds.has(p.id));
+    return [...fromServer, ...extra].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+  }, [messages, optimisticVersion]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [displayMessages]);
 
   const sendMessage = (type = 'text', content, file_name = null) => {
     if (!content && type === 'text') return;
     const tempId = 'temp-' + Date.now();
-    if (type === 'text') {
-      const tempMsg = { id: tempId, content, sender_id: currentUserId, type: 'text', created_at: new Date().toISOString(), sender: null };
-      setMessages((prev) => [...prev, tempMsg]);
-      setText('');
-    } else {
-      const tempMsg = { id: tempId, content, sender_id: currentUserId, type, file_name: file_name || null, created_at: new Date().toISOString(), sender: null };
-      setMessages((prev) => [...prev, tempMsg]);
-    }
+    const tempMsg = {
+      id: tempId,
+      content,
+      sender_id: currentUserId,
+      type: type === 'text' ? 'text' : type,
+      file_name: file_name || null,
+      created_at: new Date().toISOString(),
+      sender: null
+    };
+    optimisticRef.current = [...optimisticRef.current, tempMsg];
+    setOptimisticVersion((v) => v + 1);
+    if (type === 'text') setText('');
     if (socket) socket.emit('send_message', { conversationId: conversation.id, type, content, file_name });
   };
 
@@ -92,15 +105,15 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
   if (!conversation) return null;
 
   return (
-    <div style={styles.room}>
+    <div className="chat-room-inner" style={styles.room}>
       <div style={styles.header}>
         <button type="button" style={styles.backBtn} onClick={onBack}>← رجوع</button>
-        <span style={{ fontWeight: 600 }}>{conversation.label || conversation.name || 'محادثة'}</span>
+        <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{conversation.label || conversation.name || 'محادثة'}</span>
       </div>
-      <div style={styles.messages}>
+      <div className="chat-msg-area" style={styles.messages}>
         {loading && <p style={{ color: 'var(--text-muted)' }}>جاري التحميل...</p>}
-        {messages.map((m) => {
-          const isOwn = m.sender_id === currentUserId;
+        {displayMessages.map((m) => {
+          const isOwn = Number(m.sender_id) === Number(currentUserId);
           return (
             <div key={m.id} style={{ ...styles.msg, ...(isOwn ? styles.msgOwn : styles.msgOther) }}>
               {!isOwn && m.sender && <div style={{ fontSize: 12, opacity: 0.9 }}>{m.sender.name || m.sender.email || m.sender.phone}</div>}
@@ -115,6 +128,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
       </div>
       {fileError && <p style={{ padding: 8, margin: 0, fontSize: 13, color: '#f85149', background: 'rgba(248,81,73,0.1)' }}>{fileError}</p>}
       <form
+        className="chat-form-row"
         style={styles.form}
         onSubmit={(e) => { e.preventDefault(); sendMessage('text', text.trim()); }}
       >

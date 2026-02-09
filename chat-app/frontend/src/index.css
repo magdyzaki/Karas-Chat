@@ -8,6 +8,49 @@
   --primary: #238636;
   --primary-hover: #2ea043;
 }
-body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+html { overflow-x: hidden; }
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
 input, textarea, button { font-family: inherit; }
 a { color: var(--primary); }
+
+/* الشات يملأ الشاشة على الموبايل */
+#root { width: 100%; max-width: 100%; min-height: 100vh; }
+@media (max-width: 600px) {
+  #root { padding: 0; }
+}
+.app-header {
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+}
+
+/* تخطيط متجاوب للشات */
+.app-container { min-width: 0; }
+.app-flex .chat-list-wrap {
+  width: 280px;
+  min-width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.app-flex .chat-room-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+@media (max-width: 600px) {
+  .app-container { max-width: 100%; }
+  .app-flex .chat-list-wrap {
+    width: 100%;
+    min-width: 100%;
+  }
+  .app-flex.room-open .chat-list-wrap { display: none !important; }
+  .app-flex .chat-room-wrap { width: 100%; }
+  .chat-list { width: 100% !important; min-width: 0 !important; }
+  .chat-room-inner { padding: 8px !important; }
+  .chat-msg-area { padding: 10px !important; }
+  .chat-form-row { padding: 8px !important; gap: 6px !important; }
+  .chat-form-row input { min-height: 40px; font-size: 16px; }
+}

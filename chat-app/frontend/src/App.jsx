@@ -110,14 +110,15 @@ function App() {
   const currentConv = conversations.find((c) => c.id === currentConvId);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', maxWidth: 900, margin: '0 auto' }}>
-      <header style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0, fontSize: 18 }}>شات</h1>
-        <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{user.name || user.email || user.phone || 'أنت'}</span>
-        <button type="button" onClick={handleLogout} style={{ padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>خروج</button>
+    <div className="app-container" style={{ display: 'flex', height: '100dvh', flexDirection: 'column', maxWidth: 900, margin: '0 auto', width: '100%' }}>
+      <header className="app-header" style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <h1 style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 18px)' }}>شات</h1>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name || user.email || user.phone || 'أنت'}</span>
+        <button type="button" onClick={handleLogout} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>خروج</button>
       </header>
-      {error && <p style={{ padding: 8, margin: 0, background: 'rgba(248,81,73,0.15)', color: '#f85149', textAlign: 'center' }}>{error}</p>}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {error && <p style={{ padding: 6, margin: 0, background: 'rgba(248,81,73,0.15)', color: '#f85149', textAlign: 'center', fontSize: 13 }}>{error}</p>}
+      <div className={`app-flex ${currentConvId ? 'room-open' : ''}`} style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+        <div className="chat-list-wrap">
         <ChatList
           conversations={conversations}
           currentConvId={currentConvId}
@@ -129,6 +130,8 @@ function App() {
           onCloseNewChat={() => setShowNewChat(false)}
           currentUserId={user.id}
         />
+        </div>
+        <div className="chat-room-wrap">
         {currentConvId ? (
           <ChatRoom
             conversation={currentConv}
@@ -137,8 +140,9 @@ function App() {
             onBack={() => setCurrentConvId(null)}
           />
         ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>اختر محادثة أو ابدأ محادثة جديدة</div>
+          <div className="chat-placeholder" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>اختر محادثة أو ابدأ محادثة جديدة</div>
         )}
+        </div>
       </div>
     </div>
   );

@@ -45,7 +45,7 @@ export default function ChatList({ conversations, currentConvId, onSelect, onNew
 
   return (
     <>
-      <div style={styles.list}>
+      <div className="chat-list" style={styles.list}>
         <div style={styles.header}>
           <span style={{ fontWeight: 600 }}>المحادثات</span>
           <button type="button" style={styles.newBtn} onClick={onNewChat}>+ محادثة جديدة</button>
