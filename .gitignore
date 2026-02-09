@@ -24,6 +24,9 @@ backups/
 *.sqlite
 *.sqlite3
 
+# كاش توكن مايكروسوفت (لا تُرفع أبداً)
+database/ms_token_cache*.bin
+
 # ملفات بيئة (سرية)
 .env
 .env.*

@@ -18,10 +18,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'chat-secret-change-in-production';
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: process.env.CORS_ORIGIN || '*', methods: ['GET', 'POST'] }
+  cors: { origin: true, methods: ['GET', 'POST'] }
 });
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

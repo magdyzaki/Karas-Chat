@@ -35,7 +35,11 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
     if (socket) {
       socket.emit('join_conversation', conversation.id);
       const onNew = (msg) => {
-        if (msg.conversation_id === conversation.id) setMessages((prev) => [...prev, msg]);
+        if (msg.conversation_id !== conversation.id) return;
+        setMessages((prev) => {
+          const withoutTemp = prev.filter((m) => !(m.id && String(m.id).startsWith('temp-') && m.content === msg.content && m.sender_id === msg.sender_id));
+          return [...withoutTemp, msg];
+        });
       };
       socket.on('new_message', onNew);
       return () => {
@@ -51,9 +55,12 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
 
   const sendMessage = (type = 'text', content, file_name = null) => {
     if (!content && type === 'text') return;
-    if (!socket) return;
-    socket.emit('send_message', { conversationId: conversation.id, type, content, file_name });
-    if (type === 'text') setText('');
+    if (type === 'text') {
+      const tempMsg = { id: 'temp-' + Date.now(), content, sender_id: currentUserId, type: 'text', created_at: new Date().toISOString(), sender: null };
+      setMessages((prev) => [...prev, tempMsg]);
+      setText('');
+    }
+    if (socket) socket.emit('send_message', { conversationId: conversation.id, type, content, file_name });
   };
 
   const handleFile = async (e) => {
