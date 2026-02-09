@@ -30,9 +30,15 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
     if (!conversation?.id) return;
     setLoading(true);
     api.getMessages(conversation.id).then((list) => {
-      setMessages(list);
+      setMessages((prev) => {
+        const temps = prev.filter((m) => m.id && String(m.id).startsWith('temp-'));
+        return temps.length ? [...list, ...temps] : list;
+      });
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => {
+      setLoading(false);
+      setMessages((prev) => prev.filter((m) => m.id && String(m.id).startsWith('temp-'))); // إبقاء المؤقتة فقط
+    });
     if (socket) {
       socket.emit('join_conversation', conversation.id);
       const onNew = (msg) => {
