@@ -22,6 +22,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [fileError, setFileError] = useState('');
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -37,7 +38,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
       const onNew = (msg) => {
         if (msg.conversation_id !== conversation.id) return;
         setMessages((prev) => {
-          const withoutTemp = prev.filter((m) => !(m.id && String(m.id).startsWith('temp-') && m.content === msg.content && m.sender_id === msg.sender_id));
+          const withoutTemp = prev.filter((m) => !(m.id && String(m.id).startsWith('temp-') && m.content === msg.content && m.sender_id === msg.sender_id && m.type === msg.type));
           return [...withoutTemp, msg];
         });
       };
@@ -55,10 +56,14 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
 
   const sendMessage = (type = 'text', content, file_name = null) => {
     if (!content && type === 'text') return;
+    const tempId = 'temp-' + Date.now();
     if (type === 'text') {
-      const tempMsg = { id: 'temp-' + Date.now(), content, sender_id: currentUserId, type: 'text', created_at: new Date().toISOString(), sender: null };
+      const tempMsg = { id: tempId, content, sender_id: currentUserId, type: 'text', created_at: new Date().toISOString(), sender: null };
       setMessages((prev) => [...prev, tempMsg]);
       setText('');
+    } else {
+      const tempMsg = { id: tempId, content, sender_id: currentUserId, type, file_name: file_name || null, created_at: new Date().toISOString(), sender: null };
+      setMessages((prev) => [...prev, tempMsg]);
     }
     if (socket) socket.emit('send_message', { conversationId: conversation.id, type, content, file_name });
   };
@@ -66,12 +71,15 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setFileError('');
     try {
       const { url, filename } = await api.uploadFile(file);
       const fullUrl = api.uploadsUrl(url);
       const type = (file.type || '').startsWith('image/') ? 'image' : 'file';
       sendMessage(type, fullUrl, filename);
-    } catch (_) {}
+    } catch (err) {
+      setFileError(err.message || 'فشل رفع الملف');
+    }
     e.target.value = '';
   };
 
@@ -99,6 +107,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
         })}
         <div ref={messagesEndRef} />
       </div>
+      {fileError && <p style={{ padding: 8, margin: 0, fontSize: 13, color: '#f85149', background: 'rgba(248,81,73,0.1)' }}>{fileError}</p>}
       <form
         style={styles.form}
         onSubmit={(e) => { e.preventDefault(); sendMessage('text', text.trim()); }}

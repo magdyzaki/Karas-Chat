@@ -95,6 +95,7 @@ export default function ChatList({ conversations, currentConvId, onSelect, onNew
                   </div>
                 ))}
                 <button type="button" style={{ ...styles.newBtn, marginTop: 12 }} onClick={handleCreateGroup} disabled={!groupName.trim()}>إنشاء المجموعة</button>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>اختر أعضاء أو اترك القائمة فارغة لتبدأ مجموعة معك فقط.</p>
               </div>
             )}
             <button type="button" onClick={onCloseNewChat} style={{ marginTop: 12, padding: '8px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إلغاء</button>

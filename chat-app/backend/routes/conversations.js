@@ -40,13 +40,14 @@ router.post('/direct', (req, res) => {
   const other = db.findUserById(otherUserId);
   if (!other) return res.status(404).json({ error: 'المستخدم غير موجود' });
   const { conversation } = db.getOrCreateDirectConversation(req.userId, otherUserId);
-  res.json(conversation);
+  const label = other.name || other.email || other.phone || 'محادثة';
+  res.json({ ...conversation, label });
 });
 
 router.post('/group', (req, res) => {
   const { name, memberIds } = req.body || {};
   const conv = db.createGroupConversation(req.userId, name, Array.isArray(memberIds) ? memberIds : []);
-  res.json(conv);
+  res.json({ ...conv, label: conv.name });
 });
 
 export default router;

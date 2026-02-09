@@ -79,23 +79,27 @@ function App() {
 
   const handleStartDirect = async (otherUserId) => {
     try {
+      setError('');
       const conv = await api.createDirectConversation(otherUserId);
+      setConversations((prev) => [{ ...conv, label: conv.label || conv.name || 'محادثة جديدة' }, ...prev.filter((c) => c.id !== conv.id)]);
       setCurrentConvId(conv.id);
       setShowNewChat(false);
       loadConversations();
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'فشل إنشاء المحادثة');
     }
   };
 
   const handleCreateGroup = async (name, memberIds) => {
     try {
+      setError('');
       const conv = await api.createGroupConversation(name, memberIds);
+      setConversations((prev) => [{ ...conv, label: conv.name || name || 'مجموعة جديدة' }, ...prev.filter((c) => c.id !== conv.id)]);
       setCurrentConvId(conv.id);
       setShowNewChat(false);
       loadConversations();
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'فشل إنشاء المجموعة');
     }
   };
 
