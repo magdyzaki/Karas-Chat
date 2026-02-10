@@ -6,7 +6,7 @@ import ChatList from './ChatList';
 import ChatRoom from './ChatRoom';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || '';
-const BUILD_ID = 'chat-2026-02-10-01';
+const BUILD_ID = 'chat-2026-02-10-02';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -133,12 +133,14 @@ function App() {
         <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name || user.email || user.phone || 'أنت'}</span>
         <button type="button" onClick={handleLogout} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>خروج</button>
       </header>
-      <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
-        <span>Build: {BUILD_ID}</span>
-        <span style={{ marginRight: 10 }}>• Socket: {socketStatus}</span>
-        {socketError && <span style={{ marginRight: 10, color: '#f85149' }}>({socketError})</span>}
-        {socketBase && <span style={{ display: 'block', opacity: 0.75, marginTop: 2, direction: 'ltr', textAlign: 'left' }}>base: {socketBase}</span>}
-      </div>
+      {typeof window !== 'undefined' && /[?&]debug=1/.test(window.location.search) && (
+        <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
+          <span>Build: {BUILD_ID}</span>
+          <span style={{ marginRight: 10 }}>• Socket: {socketStatus}</span>
+          {socketError && <span style={{ marginRight: 10, color: '#f85149' }}>({socketError})</span>}
+          {socketBase && <span style={{ display: 'block', opacity: 0.75, marginTop: 2, direction: 'ltr', textAlign: 'left' }}>base: {socketBase}</span>}
+        </div>
+      )}
       {error && <p style={{ padding: 6, margin: 0, background: 'rgba(248,81,73,0.15)', color: '#f85149', textAlign: 'center', fontSize: 13 }}>{error}</p>}
       <div className={`app-flex ${currentConvId ? 'room-open' : ''}`} style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         <div className="chat-list-wrap">
