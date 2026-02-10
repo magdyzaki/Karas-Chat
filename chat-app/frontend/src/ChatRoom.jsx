@@ -11,7 +11,7 @@ const styles = {
   msgOther: { background: 'var(--surface)', border: '1px solid var(--border)' },
   msgMeta: { fontSize: 11, opacity: 0.8, marginTop: 4 },
   form: { padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-end' },
-  input: { flex: 1, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 15, minHeight: 44 },
+  input: { flex: 1, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 15, minHeight: 44, textAlign: 'right' },
   sendBtn: { padding: '10px 20px', border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', cursor: 'pointer', fontSize: 15 },
   fileBtn: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' },
   img: { maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginTop: 4 },
