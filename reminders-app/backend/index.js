@@ -9,7 +9,6 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// إعداد مفاتيح VAPID لإشعارات الدفع (حتى تعمل مع الشاشة مطفية)
 let vapidKeys = { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY };
 if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
   vapidKeys = webpush.generateVAPIDKeys();
@@ -33,16 +32,15 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
 
-// التحقق من التنبيهات المستحقة وإرسال Push
-function runPushCheck() {
+async function runPushCheck() {
   if (!vapidKeys.publicKey || !vapidKeys.privateKey) return;
-  const due = db.getDueRemindersNotNotified();
-  due.forEach((r) => {
-    const subs = db.getPushSubscriptionsByUserId(r.user_id);
-    if (subs.length === 0) return;
+  const due = await db.getDueRemindersNotNotified();
+  for (const r of due) {
+    const subs = await db.getPushSubscriptionsByUserId(r.user_id);
+    if (subs.length === 0) continue;
     const payload = { id: r.id, title: r.title, body: r.body || '' };
     webpush.setVapidDetails('mailto:reminders@local', vapidKeys.publicKey, vapidKeys.privateKey);
-    subs.forEach((sub) => {
+    for (const sub of subs) {
       const keys = sub.keys || {};
       const pushSub = {
         endpoint: sub.endpoint,
@@ -51,40 +49,43 @@ function runPushCheck() {
           auth: keys.auth || keys.Auth || ''
         }
       };
-      if (!pushSub.keys.p256dh || !pushSub.keys.auth) return;
-      webpush.sendNotification(pushSub, JSON.stringify(payload)).catch((err) => {
+      if (!pushSub.keys.p256dh || !pushSub.keys.auth) continue;
+      try {
+        await webpush.sendNotification(pushSub, JSON.stringify(payload));
+      } catch (err) {
         console.error('Push failed:', err.message);
-      });
-    });
-    db.markReminderNotified(r.id);
-  });
+      }
+    }
+    await db.markReminderNotified(r.id);
+  }
 }
 
-runPushCheck(); // فور بدء السيرفر
+runPushCheck().catch((err) => console.error('runPushCheck error:', err.message));
 const CHECK_PUSH_MS = 60 * 1000;
-setInterval(runPushCheck, CHECK_PUSH_MS); // ثم كل دقيقة (يتوقف عند نوم السيرفر على Koyeb)
+setInterval(() => runPushCheck().catch((e) => console.error(e.message)), CHECK_PUSH_MS);
 
-// مسار لتفعيل الفحص من كرون خارجي (حتى يعمل التنبيه عندما السيرفر نائم - Scale to Zero)
 app.get('/api/push/check', (req, res) => {
   const secret = process.env.CRON_SECRET;
   if (!secret) return res.status(503).json({ error: 'CRON_SECRET غير مضبوط في Koyeb' });
   if (req.query.secret !== secret) return res.status(401).json({ error: 'غير مصرح' });
-  runPushCheck();
-  res.json({ ok: true, message: 'تم فحص التنبيهات' });
+  runPushCheck().then(() => res.json({ ok: true, message: 'تم فحص التنبيهات' })).catch((e) => res.status(500).json({ error: e.message }));
 });
 
-// تشخيص: عدد الاشتراكات والتنبيهات (للتأكد من أن البيانات موجودة على السيرفر)
-app.get('/api/push/status', (req, res) => {
+app.get('/api/push/status', async (req, res) => {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.query.secret !== secret) return res.status(401).json({ error: 'غير مصرح' });
-  const stats = db.getStats();
-  res.json({
-    ok: true,
-    push_subscriptions_count: stats.push_subscriptions_count,
-    reminders_count: stats.reminders_count,
-    due_not_notified_count: stats.due_not_notified_count,
-    vapid_set: !!(vapidKeys.publicKey && vapidKeys.privateKey)
-  });
+  try {
+    const stats = await db.getStats();
+    res.json({
+      ok: true,
+      push_subscriptions_count: stats.push_subscriptions_count,
+      reminders_count: stats.reminders_count,
+      due_not_notified_count: stats.due_not_notified_count,
+      vapid_set: !!(vapidKeys.publicKey && vapidKeys.privateKey)
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
