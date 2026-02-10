@@ -1,10 +1,33 @@
 const path = require('path');
+const fs = require('fs');
 const os = require('os');
 const { LowSync } = require('lowdb');
 const { JSONFileSync } = require('lowdb/node');
 
-// على السحابة (Koyeb وغيرها) استخدم مجلد مؤقت قابل للكتابة
-const dbPath = process.env.DB_PATH || (process.env.PORT ? path.join(os.tmpdir(), 'reminders-db.json') : path.join(__dirname, 'db.json'));
+// تخزين دائم: على السيرفر يجب ضبط DB_PATH لمسار على قرص ثابت (مثل /data/reminders-db.json)
+// وإلا تُستخدم مجلد مؤقت تُمسح بياناته عند إعادة التشغيل أو النوم
+function getDbPath() {
+  if (process.env.DB_PATH) return process.env.DB_PATH;
+  if (process.env.PORT) {
+    return path.join(os.tmpdir(), 'reminders-db.json');
+  }
+  return path.join(__dirname, 'db.json');
+}
+
+const dbPath = getDbPath();
+
+if (process.env.PORT && !process.env.DB_PATH) {
+  console.warn('');
+  console.warn('*** تحذير: DB_PATH غير مضبوط. البيانات (تنبيهات ومستخدمين) ستُفقد عند إعادة تشغيل السيرفر أو نومه. ***');
+  console.warn('*** للحفظ الدائم: أضف قرصاً ثابتاً (Persistent Disk) وضبط متغير البيئة: DB_PATH=/data/reminders-db.json ***');
+  console.warn('');
+}
+
+const dbDir = path.dirname(dbPath);
+try {
+  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+} catch (_) {}
+
 const adapter = new JSONFileSync(dbPath);
 const low = new LowSync(adapter, { users: [], reminders: [], push_subscriptions: [] });
 low.read();
