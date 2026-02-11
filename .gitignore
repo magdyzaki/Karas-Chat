@@ -35,9 +35,12 @@ database/ms_token_cache*.bin
 # رفع ملفات الشات (تُنشأ على السيرفر)
 chat-app/backend/uploads/*
 !chat-app/backend/uploads/.gitkeep
+chat-app-new/backend/uploads/*
+!chat-app-new/backend/uploads/.gitkeep
 
 # نسخة كربون من المشروع (اختياري — لو حابب ترفعها احذف السطرين)
 reminders-app - Copy/
+chat-app-new - Copy/
 
 # نظام وتحرير
 .DS_Store
