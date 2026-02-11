@@ -3,8 +3,11 @@ const db = require('../db');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
+const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '1').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
+const isAdmin = (id) => id && ADMIN_IDS.includes(Number(id));
 
 router.post('/invite-links', auth, async (req, res) => {
+  if (!isAdmin(req.userId)) return res.status(403).json({ error: 'غير مصرح' });
   try {
     const row = await db.createInviteLink(req.userId);
     res.json({ token: row.token });

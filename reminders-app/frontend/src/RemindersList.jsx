@@ -96,14 +96,22 @@ export default function RemindersList({ user, reminders, error, isAdmin, onLogou
     try {
       const list = await api.getBlockedUsers();
       setBlockedUsers(list);
-    } catch (_) {}
+      if (onError) onError('');
+    } catch (e) {
+      if (onError) onError(e.message || 'غير مصرح');
+      setBlockedUsers([]);
+    }
   };
 
   const loadAllUsers = async () => {
     try {
       const list = await api.getAllUsers();
       setAllUsers(list);
-    } catch (_) {}
+      if (onError) onError('');
+    } catch (e) {
+      if (onError) onError(e.message || 'غير مصرح');
+      setAllUsers([]);
+    }
   };
 
   const handleBlock = async (targetId) => {
@@ -131,25 +139,24 @@ export default function RemindersList({ user, reminders, error, isAdmin, onLogou
       <header style={styles.header}>
         <h1 style={styles.title}>Karas — تنبيهات</h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {isAdmin && (
-            <>
-              <button type="button" style={{ ...styles.btn, background: 'var(--primary)', color: '#fff' }} onClick={handleCreateInvite} disabled={inviteLoading} title="رابط للآيفون والأندرويد">{inviteLoading ? '...' : '📱 رابط دعوة (آيفون/أندرويد)'}</button>
-              <button type="button" style={styles.btn} onClick={() => { setBlockedModal(true); loadBlocked(); }}>الموقوفون</button>
-              <button type="button" style={{ ...styles.btn, background: 'rgba(248,81,73,0.2)', color: '#f85149' }} onClick={() => { setBlockUserModal(true); loadAllUsers(); loadBlocked(); }}>إيقاف مستخدم</button>
-            </>
-          )}
+          {/* أزرار الأدمن — تظهر للجميع، والباكند يرفض غير المسؤولين */}
+          <>
+            <button type="button" style={{ ...styles.btn, background: 'var(--primary)', color: '#fff' }} onClick={handleCreateInvite} disabled={inviteLoading} title="رابط للآيفون والأندرويد">{inviteLoading ? '...' : '📱 رابط دعوة (آيفون/أندرويد)'}</button>
+            <button type="button" style={styles.btn} onClick={() => { setBlockedModal(true); loadBlocked(); }}>الموقوفون</button>
+            <button type="button" style={{ ...styles.btn, background: 'rgba(248,81,73,0.2)', color: '#f85149' }} onClick={() => { setBlockUserModal(true); loadAllUsers(); loadBlocked(); }}>إيقاف مستخدم</button>
+          </>
           <button type="button" style={styles.btn} onClick={onRefresh}>تحديث</button>
           <button type="button" style={styles.btn} onClick={onLogout}>خروج</button>
         </div>
       </header>
       {isAdmin && (
-        <p style={{ fontSize: 12, color: 'var(--primary-light)', marginBottom: 8, padding: '6px 10px', background: 'rgba(26,95,74,0.15)', borderRadius: 8, display: 'inline-block' }}>✓ مسؤول — رابط دعوة (آيفون/أندرويد)، الموقوفون، إيقاف مستخدم</p>
+        <p style={{ fontSize: 12, color: 'var(--primary-light)', marginBottom: 8, padding: '6px 10px', background: 'rgba(26,95,74,0.15)', borderRadius: 8, display: 'inline-block' }}>✓ مسؤول — يمكنك استخدام رابط الدعوة وإيقاف المستخدمين</p>
       )}
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
         مرحباً، {user?.name || user?.email}. التنبيهات تظهر مكتوبة ويُقرأ نصها بصوت افتراضي عند وقت التذكير.
         جميع التنبيهات تبقى في القائمة ولا تُحذف تلقائياً؛ يمكنك حذف أي تنبيه يدوياً بزر «حذف».
         لو لم يظهر تنبيه: اسمح بالإشعارات، أو اضغط «تحديث» بعد وقت التنبيه. لو استمرت المشكلة اضغط «مسح سجل التنبيهات» ثم حدّث.
-        <span style={{ display: 'block', marginTop: 6, fontSize: 11, opacity: 0.7 }}>نسخة واجهة: 2</span>
+        <span style={{ display: 'block', marginTop: 6, fontSize: 11, opacity: 0.7 }}>نسخة واجهة: 3</span>
       </p>
       {pushStatus !== null && (
         <div style={{ fontSize: 13, marginBottom: 10 }}>
