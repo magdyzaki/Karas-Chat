@@ -120,3 +120,19 @@ export function uploadsUrl(path) {
   const base = API_BASE || '';
   return path.startsWith('http') ? path : base.replace(/\/$/, '') + path;
 }
+
+export async function createInviteLink() {
+  const res = await fetch(`${API_BASE}/api/invite-links`, {
+    method: 'POST',
+    headers: headers()
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إنشاء الرابط');
+  return data;
+}
+
+export async function validateInviteLink(token) {
+  const res = await fetch(`${API_BASE}/api/validate/${encodeURIComponent(token)}`);
+  const data = await res.json().catch(() => ({}));
+  return data;
+}

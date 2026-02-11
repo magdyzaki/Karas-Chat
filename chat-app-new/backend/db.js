@@ -11,11 +11,16 @@ const low = new LowSync(adapter, {
   conversations: [],
   conversation_members: [],
   messages: [],
-  conversation_reads: []
+  conversation_reads: [],
+  invite_links: []
 });
 low.read();
 if (!low.data || !Array.isArray(low.data.users)) {
-  low.data = { users: [], conversations: [], conversation_members: [], messages: [], conversation_reads: [] };
+  low.data = { users: [], conversations: [], conversation_members: [], messages: [], conversation_reads: [], invite_links: [] };
+  low.write();
+}
+if (!Array.isArray(low.data.invite_links)) {
+  low.data.invite_links = [];
   low.write();
 }
 if (!Array.isArray(low.data.conversation_reads)) {
@@ -249,5 +254,31 @@ export const db = {
     low.read();
     const arr = low.data.conversation_reads || [];
     return arr.filter((r) => r.conversation_id === Number(conversationId));
+  },
+
+  createInviteLink(userId) {
+    low.read();
+    const token = 'i_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    const row = {
+      token,
+      created_by: Number(userId),
+      created_at: now(),
+      used_at: null
+    };
+    low.data.invite_links.push(row);
+    low.write();
+    return row;
+  },
+  consumeInviteLink(token) {
+    low.read();
+    const row = low.data.invite_links.find((l) => l.token === token && !l.used_at);
+    if (!row) return false;
+    row.used_at = now();
+    low.write();
+    return true;
+  },
+  getInviteLink(token) {
+    low.read();
+    return low.data.invite_links.find((l) => l.token === token);
   }
 };

@@ -9,6 +9,7 @@ import { db } from './db.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import convRoutes from './routes/conversations.js';
+import inviteRoutes from './routes/invite.js';
 import { jwtVerify } from './middleware/auth.js';
 import { upload } from './middleware/upload.js';
 
@@ -28,6 +29,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', jwtVerify, userRoutes);
 app.use('/api/conversations', jwtVerify, convRoutes);
+app.use('/api', inviteRoutes);
 
 app.post('/api/upload', jwtVerify, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'لم يُرفع ملف' });
