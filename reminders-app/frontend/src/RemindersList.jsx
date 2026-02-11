@@ -130,18 +130,21 @@ export default function RemindersList({ user, reminders, error, isAdmin, onLogou
     <div style={styles.page}>
       <header style={styles.header}>
         <h1 style={styles.title}>Karas — تنبيهات</h1>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {isAdmin && (
             <>
-              <button style={{ ...styles.btn, background: 'var(--primary)' }} onClick={handleCreateInvite} disabled={inviteLoading}>{inviteLoading ? '...' : 'رابط دعوة'}</button>
-              <button style={styles.btn} onClick={() => { setBlockedModal(true); loadBlocked(); }}>الموقوفون</button>
-              <button style={styles.btn} onClick={() => { setBlockUserModal(true); loadAllUsers(); loadBlocked(); }}>إيقاف مستخدم</button>
+              <button type="button" style={{ ...styles.btn, background: 'var(--primary)', color: '#fff' }} onClick={handleCreateInvite} disabled={inviteLoading} title="رابط للآيفون والأندرويد">{inviteLoading ? '...' : '📱 رابط دعوة (آيفون/أندرويد)'}</button>
+              <button type="button" style={styles.btn} onClick={() => { setBlockedModal(true); loadBlocked(); }}>الموقوفون</button>
+              <button type="button" style={{ ...styles.btn, background: 'rgba(248,81,73,0.2)', color: '#f85149' }} onClick={() => { setBlockUserModal(true); loadAllUsers(); loadBlocked(); }}>إيقاف مستخدم</button>
             </>
           )}
-          <button style={styles.btn} onClick={onRefresh}>تحديث</button>
-          <button style={styles.btn} onClick={onLogout}>خروج</button>
+          <button type="button" style={styles.btn} onClick={onRefresh}>تحديث</button>
+          <button type="button" style={styles.btn} onClick={onLogout}>خروج</button>
         </div>
       </header>
+      {isAdmin && (
+        <p style={{ fontSize: 12, color: 'var(--primary-light)', marginBottom: 8, padding: '6px 10px', background: 'rgba(26,95,74,0.15)', borderRadius: 8, display: 'inline-block' }}>✓ مسؤول — رابط دعوة (آيفون/أندرويد)، الموقوفون، إيقاف مستخدم</p>
+      )}
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
         مرحباً، {user?.name || user?.email}. التنبيهات تظهر مكتوبة ويُقرأ نصها بصوت افتراضي عند وقت التذكير.
         جميع التنبيهات تبقى في القائمة ولا تُحذف تلقائياً؛ يمكنك حذف أي تنبيه يدوياً بزر «حذف».
@@ -262,18 +265,24 @@ export default function RemindersList({ user, reminders, error, isAdmin, onLogou
 
       {inviteModal && (
         <div onClick={() => setInviteModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 420, width: '100%', maxHeight: '90vh', overflow: 'auto' }}>
             <h3 style={{ marginTop: 0 }}>رابط دعوة — للآيفون والأندرويد</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>الرابط يعمل مرة واحدة ولا يُعاد إرساله.</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>الرابط يعمل على الجهازين. استخدمه مرة واحدة ولا تُشاركه مع أكثر من شخص.</p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <button type="button" onClick={handleCreateInvite} disabled={inviteLoading} style={{ flex: 1, padding: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer' }}>{inviteLoading ? '...' : '📱 للآيفون'}</button>
-              <button type="button" onClick={handleCreateInvite} disabled={inviteLoading} style={{ flex: 1, padding: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer' }}>{inviteLoading ? '...' : '🤖 للأندرويد'}</button>
+              <button type="button" onClick={handleCreateInvite} disabled={inviteLoading} style={{ flex: 1, padding: 12, background: inviteLoading ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 14 }}>{inviteLoading ? '...' : '📱 إنشاء رابط للآيفون'}</button>
+              <button type="button" onClick={handleCreateInvite} disabled={inviteLoading} style={{ flex: 1, padding: 12, background: inviteLoading ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 14 }}>{inviteLoading ? '...' : '🤖 إنشاء رابط للأندرويد'}</button>
             </div>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>الرابط نفسه يعمل على الآيفون والأندرويد — اختر حسب من سيرسله له صديقك.</p>
             {inviteModal.link && (
               <>
-                <input type="text" readOnly value={inviteModal.link} style={{ width: '100%', padding: 10, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', marginBottom: 12 }} />
+                <input type="text" readOnly value={inviteModal.link} style={{ width: '100%', padding: 10, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', marginBottom: 12, boxSizing: 'border-box' }} />
+                <div style={{ background: 'rgba(0,0,0,0.08)', borderRadius: 8, padding: 12, marginBottom: 12, textAlign: 'right' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>تعليمات للصديق:</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}><strong>آيفون:</strong> اضغط زر المشاركة → إضافة إلى الشاشة الرئيسية → إضافة</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}><strong>أندرويد:</strong> في Chrome: القائمة ⋮ → إضافة إلى الشاشة الرئيسية → إضافة</p>
+                </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" onClick={copyInviteLink} style={{ flex: 1, padding: 10, background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>{inviteModal.copied ? 'تم النسخ ✓' : 'نسخ'}</button>
+                  <button type="button" onClick={copyInviteLink} style={{ flex: 1, padding: 10, background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 14 }}>{inviteModal.copied ? 'تم النسخ ✓' : 'نسخ الرابط'}</button>
                   <button type="button" onClick={() => setInviteModal(null)} style={{ padding: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إغلاق</button>
                 </div>
               </>
