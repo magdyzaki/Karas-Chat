@@ -1,0 +1,8 @@
+{
+  "appId": "com.karas.chat",
+  "appName": "Karas شات",
+  "webDir": "../frontend/dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

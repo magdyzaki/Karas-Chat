@@ -183,7 +183,10 @@ function App() {
     <div className="app-container" style={{ display: 'flex', height: '100dvh', flexDirection: 'column', maxWidth: 900, margin: '0 auto', width: '100%' }}>
       <header className="app-header" style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <h1 style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 18px)' }}>Karas شات</h1>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name || user.email || user.phone || 'أنت'}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {user.name || user.email || user.phone || 'أنت'}
+          {user?.id && !isAdmin(user?.id) && <span style={{ fontSize: 10, opacity: 0.8, marginRight: 4 }} title="أضف هذا الرقم في VITE_ADMIN_USER_IDS و ADMIN_USER_IDS لتصبح مسؤولاً"> (معرف: {user.id})</span>}
+        </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {isAdmin(user?.id) && (
             <>

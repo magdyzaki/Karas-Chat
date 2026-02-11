@@ -41,6 +41,8 @@ chat-app-new/backend/uploads/*
 # نسخة كربون من المشروع (اختياري — لو حابب ترفعها احذف السطرين)
 reminders-app - Copy/
 chat-app-new - Copy/
+reminders-frontend-deploy/
+reminders-backend-deploy/
 
 # نظام وتحرير
 .DS_Store

@@ -70,6 +70,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
   const pendingOfferRef = useRef(null);
+  const incomingCallRingRef = useRef(null);
   const [callWithVideo, setCallWithVideo] = useState(true);
   const [hasLocalStream, setHasLocalStream] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
@@ -257,6 +258,21 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
     }
   }, [callState, hasLocalStream]);
 
+  useEffect(() => {
+    if (callState === 'incoming') {
+      playIncomingCallRing();
+      const id = setInterval(playIncomingCallRing, 2000);
+      incomingCallRingRef.current = id;
+      return () => {
+        if (incomingCallRingRef.current) clearInterval(incomingCallRingRef.current);
+        incomingCallRingRef.current = null;
+      };
+    } else {
+      if (incomingCallRingRef.current) clearInterval(incomingCallRingRef.current);
+      incomingCallRingRef.current = null;
+    }
+  }, [callState]);
+
   const emitTyping = useCallback(() => {
     if (!socket || !conversation?.id) return;
     socket.emit('typing', { conversationId: conversation.id });
@@ -339,6 +355,28 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
     } catch (_) {}
   };
 
+  const playIncomingCallRing = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.connect(ctx.destination);
+      const t = ctx.currentTime;
+      const osc1 = ctx.createOscillator();
+      osc1.connect(gain);
+      osc1.frequency.value = 800;
+      osc1.type = 'sine';
+      osc1.start(t);
+      osc1.stop(t + 0.4);
+      const osc2 = ctx.createOscillator();
+      osc2.connect(gain);
+      osc2.frequency.value = 1000;
+      osc2.type = 'sine';
+      osc2.start(t + 0.2);
+      osc2.stop(t + 0.6);
+    } catch (_) {}
+  };
+
   const playSendSound = () => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -415,7 +453,24 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   const isDirectTwo = conversation?.type === 'direct' && otherUserId != null;
 
   const createPeerConnection = () => {
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const iceServers = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' }
+    ];
+    const turnUri = import.meta.env.VITE_TURN_URI;
+    if (turnUri) {
+      const turn = { urls: turnUri };
+      const u = import.meta.env.VITE_TURN_USERNAME;
+      const c = import.meta.env.VITE_TURN_CREDENTIAL;
+      if (u && c) {
+        turn.username = u;
+        turn.credential = c;
+      }
+      iceServers.push(turn);
+    }
+    const pc = new RTCPeerConnection({ iceServers });
     pc.ontrack = (e) => {
       if (!e.streams?.[0]) return;
       const stream = e.streams[0];
