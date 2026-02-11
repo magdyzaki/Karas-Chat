@@ -191,10 +191,11 @@ function App() {
         <div onClick={() => setInviteLinkModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%' }}>
             <h3 style={{ marginTop: 0 }}>رابط للآيفون — يستخدم مرة واحدة فقط</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>أرسل هذا الرابط للشخص. عند فتحه على الآيفون سيُستهلك ولا يعمل على جهاز آخر.</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>أرسل هذا الرابط للشخص. عند فتحه سيُستهلك ولا يعمل مرة أخرى. لكل صديق اضغط «رابط جديد».</p>
             <input type="text" readOnly value={inviteLinkModal.link} style={{ width: '100%', padding: 10, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', marginBottom: 12 }} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={copyInviteLink} style={{ flex: 1, padding: 10, background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>{inviteLinkModal.copied ? 'تم النسخ ✓' : 'نسخ الرابط'}</button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" onClick={copyInviteLink} style={{ flex: 1, minWidth: 100, padding: 10, background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>{inviteLinkModal.copied ? 'تم النسخ ✓' : 'نسخ الرابط'}</button>
+              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ flex: 1, minWidth: 100, padding: 10, background: inviteLoading ? 'var(--text-muted)' : 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer' }}>{inviteLoading ? '...' : 'رابط جديد'}</button>
               <button type="button" onClick={() => setInviteLinkModal(null)} style={{ padding: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إغلاق</button>
             </div>
           </div>
