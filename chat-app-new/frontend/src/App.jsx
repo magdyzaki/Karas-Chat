@@ -7,6 +7,8 @@ import ChatRoom from './ChatRoom';
 import InvitePage from './InvitePage';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || '';
+const ADMIN_IDS = (import.meta.env.VITE_ADMIN_USER_IDS || '1').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
+const isAdmin = (userId) => userId && ADMIN_IDS.length > 0 && ADMIN_IDS.includes(Number(userId));
 
 function parseInviteToken() {
   const m = window.location.pathname.match(/^\/invite\/([a-zA-Z0-9_]+)/);
@@ -152,7 +154,9 @@ function App() {
         <h1 style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 18px)' }}>Karas شات</h1>
         <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name || user.email || user.phone || 'أنت'}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ padding: '6px 10px', background: inviteLoading ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 12 }}>{inviteLoading ? '...' : 'رابط للآيفون'}</button>
+          {isAdmin(user?.id) && (
+            <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ padding: '6px 10px', background: inviteLoading ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 12 }}>{inviteLoading ? '...' : 'رابط للآيفون'}</button>
+          )}
           <button type="button" onClick={handleLogout} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>خروج</button>
         </div>
       </header>
