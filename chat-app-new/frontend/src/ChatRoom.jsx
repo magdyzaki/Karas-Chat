@@ -103,15 +103,13 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
         setMessages((prev) => [...prev, msg]);
         if (Number(msg.sender_id) !== Number(currentUserId)) {
           if (msg.id != null) socket.emit('mark_read', { conversationId: conversation.id, lastMessageId: msg.id });
-          if (document.hidden) {
-            playNotificationSound();
-            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-              try {
-                const sender = msg.sender?.name || msg.sender?.email || msg.sender?.phone || 'شخص';
-                const body = msg.type === 'text' ? (msg.content || '').slice(0, 80) : msg.type === 'image' ? '🖼 صورة' : msg.type === 'voice' ? '🎤 رسالة صوتية' : 'رسالة جديدة';
-                new Notification(`${conversation.label || 'محادثة'} — ${sender}`, { body, icon: '/icon-192.png' });
-              } catch (_) {}
-            }
+          playNotificationSound();
+          if (document.hidden && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            try {
+              const sender = msg.sender?.name || msg.sender?.email || msg.sender?.phone || 'شخص';
+              const body = msg.type === 'text' ? (msg.content || '').slice(0, 80) : msg.type === 'image' ? '🖼 صورة' : msg.type === 'voice' ? '🎤 رسالة صوتية' : 'رسالة جديدة';
+              new Notification(`${conversation.label || 'محادثة'} — ${sender}`, { body, icon: '/icon-192.png' });
+            } catch (_) {}
           }
         }
       };
@@ -287,6 +285,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
     setOptimisticVersion((v) => v + 1);
     if (type === 'text') setText('');
     setReplyTo(null);
+    playSendSound();
     if (socket) socket.emit('send_message', {
       conversationId: conversation.id,
       type,
@@ -337,6 +336,21 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
       };
       playTone(880, 0, 0.08);
       playTone(1100, 0.1, 0.12);
+    } catch (_) {}
+  };
+
+  const playSendSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.connect(ctx.destination);
+      const osc = ctx.createOscillator();
+      osc.connect(gain);
+      osc.frequency.value = 600;
+      osc.type = 'sine';
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.06);
     } catch (_) {}
   };
 
@@ -677,7 +691,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
         <div ref={emojiPickerRef} style={{ position: 'relative' }}>
           <button type="button" style={s.emojiBtn} onClick={() => setShowEmojiPicker((v) => !v)} title="إيموجي">😀</button>
           {showEmojiPicker && (
-            <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, zIndex: 20 }}>
+            <div style={{ position: 'fixed', bottom: 70, left: '50%', transform: 'translateX(-50%)', zIndex: 20, maxWidth: 'min(320px, calc(100vw - 24px))' }}>
               <EmojiPicker onEmojiClick={(e) => { setText((t) => t + (e.emoji || '')); setShowEmojiPicker(false); }} theme="dark" width={320} height={360} />
             </div>
           )}
