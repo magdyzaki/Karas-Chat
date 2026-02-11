@@ -72,6 +72,13 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   const pendingOfferRef = useRef(null);
   const [callWithVideo, setCallWithVideo] = useState(true);
   const [hasLocalStream, setHasLocalStream] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null);
+
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (!conversation?.id) return;
@@ -96,7 +103,16 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
         setMessages((prev) => [...prev, msg]);
         if (Number(msg.sender_id) !== Number(currentUserId)) {
           if (msg.id != null) socket.emit('mark_read', { conversationId: conversation.id, lastMessageId: msg.id });
-          if (document.hidden) playNotificationSound();
+          if (document.hidden) {
+            playNotificationSound();
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              try {
+                const sender = msg.sender?.name || msg.sender?.email || msg.sender?.phone || 'شخص';
+                const body = msg.type === 'text' ? (msg.content || '').slice(0, 80) : msg.type === 'image' ? '🖼 صورة' : msg.type === 'voice' ? '🎤 رسالة صوتية' : 'رسالة جديدة';
+                new Notification(`${conversation.label || 'محادثة'} — ${sender}`, { body, icon: '/icon-192.png' });
+              } catch (_) {}
+            }
+          }
         }
       };
       const onTyping = (data) => {
@@ -308,15 +324,19 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   const playNotificationSound = () => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.connect(gain);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
       gain.connect(ctx.destination);
-      osc.frequency.value = 800;
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.15);
+      const playTone = (freq, start, dur) => {
+        const osc = ctx.createOscillator();
+        osc.connect(gain);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + dur);
+      };
+      playTone(880, 0, 0.08);
+      playTone(1100, 0.1, 0.12);
     } catch (_) {}
   };
 
@@ -472,6 +492,14 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showEmojiPicker]);
 
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && lightboxImage) setLightboxImage(null);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [lightboxImage]);
+
   if (!conversation) return null;
 
   return (
@@ -513,6 +541,46 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
         </div>
       )}
       {(callState === 'calling' || callState === 'connected') && <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />}
+      {lightboxImage && (
+        <div
+          onClick={() => setLightboxImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+            padding: 16
+          }}
+        >
+          <img
+            src={lightboxImage}
+            alt=""
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setLightboxImage(null)}
+            style={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              padding: '10px 20px',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              color: 'var(--text)',
+              cursor: 'pointer',
+              fontSize: 16
+            }}
+          >
+            ✕ إغلاق
+          </button>
+        </div>
+      )}
       <div style={s.searchRow}>
         <input type="text" placeholder="بحث في الرسائل..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={s.searchInput} />
         {searchQuery.trim() && <button type="button" style={s.copyBtn} onClick={() => setSearchQuery('')}>إلغاء</button>}
@@ -546,7 +614,14 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
               ) : (
                 <>
                   {m.type === 'text' && <div>{m.content}</div>}
-                  {m.type === 'image' && <img src={m.content} alt="" style={s.img} />}
+                  {m.type === 'image' && (
+                    <img
+                      src={m.content}
+                      alt=""
+                      style={{ ...s.img, cursor: 'pointer' }}
+                      onClick={() => setLightboxImage(m.content)}
+                    />
+                  )}
                   {m.type === 'file' && <a href={m.content} target="_blank" rel="noopener noreferrer" style={s.link}>{m.file_name || 'ملف'}</a>}
                   {m.type === 'voice' && <audio controls src={m.content} style={s.audio} />}
                   {m.type === 'location' && (
