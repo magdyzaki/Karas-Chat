@@ -131,8 +131,14 @@ export async function createInviteLink() {
   return data;
 }
 
-export async function validateInviteLink(token) {
-  const res = await fetch(`${API_BASE}/api/validate/${encodeURIComponent(token)}`);
+export async function checkInviteLink(token) {
+  const res = await fetch(`${API_BASE}/api/check-invite/${encodeURIComponent(token)}`);
+  const data = await res.json().catch(() => ({}));
+  return data;
+}
+
+export async function consumeInviteLink(token) {
+  const res = await fetch(`${API_BASE}/api/consume-invite/${encodeURIComponent(token)}`, { method: 'POST' });
   const data = await res.json().catch(() => ({}));
   return data;
 }

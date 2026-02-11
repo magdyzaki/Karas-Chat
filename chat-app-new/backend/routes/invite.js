@@ -10,16 +10,26 @@ router.post('/invite-links', jwtVerify, (req, res) => {
   res.json({ token: row.token });
 });
 
-// التحقق واستهلاك الرابط (بدون تسجيل دخول — عند فتح الرابط)
-router.get('/validate/:token', (req, res) => {
+// التحقق فقط — لا يُستهلك (لتفادي استهلاك الرابط عند معاينة واتساب)
+router.get('/check-invite/:token', (req, res) => {
   const { token } = req.params;
   if (!token) return res.status(400).json({ valid: false, error: 'رابط غير صالح' });
   const link = db.getInviteLink(token);
-  if (!link) return res.json({ valid: false, error: 'رابط غير صالح' });
-  if (link.used_at) return res.json({ valid: false, error: 'تم استخدام هذا الرابط مسبقاً ولا يمكن استخدامه مرة أخرى' });
+  if (!link) return res.json({ valid: false, used: false, error: 'رابط غير صالح' });
+  if (link.used_at) return res.json({ valid: false, used: true, error: 'تم استخدام هذا الرابط مسبقاً' });
+  res.json({ valid: true, used: false });
+});
+
+// استهلاك الرابط — يُستدعى فقط عند الضغط على «انتقل إلى التطبيق»
+router.post('/consume-invite/:token', (req, res) => {
+  const { token } = req.params;
+  if (!token) return res.status(400).json({ ok: false, error: 'رابط غير صالح' });
+  const link = db.getInviteLink(token);
+  if (!link) return res.json({ ok: false, error: 'رابط غير صالح' });
+  if (link.used_at) return res.json({ ok: false, error: 'الرابط مُستهلَك مسبقاً' });
   const ok = db.consumeInviteLink(token);
-  if (!ok) return res.json({ valid: false, error: 'فشل التحقق' });
-  res.json({ valid: true });
+  if (!ok) return res.json({ ok: false, error: 'فشل' });
+  res.json({ ok: true });
 });
 
 export default router;

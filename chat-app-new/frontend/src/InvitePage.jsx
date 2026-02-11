@@ -11,7 +11,7 @@ export default function InvitePage({ token, onValid }) {
       setError('رابط غير صالح');
       return;
     }
-    api.validateInviteLink(token).then((data) => {
+    api.checkInviteLink(token).then((data) => {
       if (data.valid) {
         setStatus('valid');
       } else {
@@ -22,7 +22,17 @@ export default function InvitePage({ token, onValid }) {
       setStatus('invalid');
       setError('فشل التحقق من الرابط');
     });
-  }, [token, onValid]);
+  }, [token]);
+
+  const handleGoToApp = async () => {
+    const data = await api.consumeInviteLink(token);
+    if (data.ok) {
+      onValid?.();
+    } else {
+      setStatus('invalid');
+      setError(data.error || 'فشل تفعيل الرابط');
+    }
+  };
 
   if (status === 'loading') {
     return (
@@ -43,7 +53,7 @@ export default function InvitePage({ token, onValid }) {
           <p style={{ margin: 0, fontSize: 15 }}>3. اضغط <strong>إضافة</strong></p>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>استخدم Safari للمتصفح — Chrome يدعمها أيضاً من القائمة ⋮</p>
-        <button type="button" onClick={() => onValid?.()} style={{ padding: '12px 24px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 16 }}>انتقل إلى التطبيق</button>
+        <button type="button" onClick={handleGoToApp} style={{ padding: '12px 24px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 16 }}>انتقل إلى التطبيق</button>
       </div>
     );
   }
