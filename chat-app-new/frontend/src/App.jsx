@@ -22,6 +22,7 @@ function App() {
   const [error, setError] = useState('');
   const [inviteToken, setInviteToken] = useState(() => parseInviteToken());
   const [inviteLinkModal, setInviteLinkModal] = useState(null); // { link, copied? }
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   const token = localStorage.getItem('chat_token');
   const savedUser = localStorage.getItem('chat_user');
@@ -32,12 +33,19 @@ function App() {
   };
 
   const handleCreateInviteLink = async () => {
+    if (inviteLoading) return;
+    setInviteLoading(true);
+    setError('');
     try {
       const data = await api.createInviteLink();
-      const link = window.location.origin + '/invite/' + data.token;
+      const link = window.location.origin + '/invite/' + (data.token || '');
       setInviteLinkModal({ link, copied: false });
     } catch (e) {
-      setError(e.message || 'فشل إنشاء الرابط');
+      const msg = e.message || 'فشل إنشاء الرابط';
+      setError(msg);
+      alert(msg);
+    } finally {
+      setInviteLoading(false);
     }
   };
 
@@ -144,7 +152,7 @@ function App() {
         <h1 style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 18px)' }}>Karas شات</h1>
         <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name || user.email || user.phone || 'أنت'}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button type="button" onClick={handleCreateInviteLink} style={{ padding: '6px 10px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 12 }}>رابط للآيفون</button>
+          <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ padding: '6px 10px', background: inviteLoading ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 12 }}>{inviteLoading ? '...' : 'رابط للآيفون'}</button>
           <button type="button" onClick={handleLogout} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>خروج</button>
         </div>
       </header>

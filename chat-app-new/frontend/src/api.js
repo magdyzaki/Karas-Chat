@@ -127,7 +127,7 @@ export async function createInviteLink() {
     headers: headers()
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'فشل إنشاء الرابط');
+  if (!res.ok) throw new Error(data.error || (res.status === 404 ? 'الرابط غير متوفر. تأكد من تحديث السيرفر.' : 'فشل إنشاء الرابط'));
   return data;
 }
 
