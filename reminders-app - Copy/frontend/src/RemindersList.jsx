@@ -24,6 +24,7 @@ const styles = {
   cardTitle: { fontWeight: 600, marginBottom: 4 },
   cardBody: { color: 'var(--text-muted)', fontSize: 14, marginBottom: 8 },
   cardTime: { fontSize: 13, color: 'var(--primary-light)' },
+  cardNotes: { fontSize: 13, color: 'var(--text-muted)', marginTop: 6, paddingRight: 4, borderRight: '2px solid var(--primary)', fontStyle: 'italic' },
   actions: { marginTop: 12, display: 'flex', gap: 8 },
   editBtn: { padding: '6px 12px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', fontSize: 13 },
   delBtn: { padding: '6px 12px', borderRadius: 8, border: 'none', background: 'rgba(199,92,92,0.3)', color: '#e88', fontSize: 13 },
@@ -74,6 +75,7 @@ export default function RemindersList({ user, reminders, error, onLogout, onRefr
       </header>
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
         مرحباً، {user?.name || user?.email}. التنبيهات تظهر مكتوبة ويُقرأ نصها بصوت افتراضي عند وقت التذكير.
+        جميع التنبيهات تبقى في القائمة ولا تُحذف تلقائياً؛ يمكنك حذف أي تنبيه يدوياً بزر «حذف».
         لو لم يظهر تنبيه: اسمح بالإشعارات، أو اضغط «تحديث» بعد وقت التنبيه. لو استمرت المشكلة اضغط «مسح سجل التنبيهات» ثم حدّث.
         <span style={{ display: 'block', marginTop: 6, fontSize: 11, opacity: 0.7 }}>نسخة واجهة: 2</span>
       </p>
@@ -138,6 +140,9 @@ export default function RemindersList({ user, reminders, error, onLogout, onRefr
               <div style={styles.cardTitle}>{r.title}</div>
               {r.body && <div style={styles.cardBody}>{r.body}</div>}
               <div style={styles.cardTime}>{formatDateTime(r.remind_at)} {r.repeat ? ` • ${r.repeat}` : ''}</div>
+              {r.notes && r.notes.trim() && (
+                <div style={styles.cardNotes}>ملاحظات: {r.notes.trim()}</div>
+              )}
               <button
                 type="button"
                 style={styles.notesToggle}
