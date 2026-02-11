@@ -4,6 +4,8 @@ const webpush = require('web-push');
 const authRoutes = require('./routes/auth');
 const reminderRoutes = require('./routes/reminders');
 const pushRoutes = require('./routes/push');
+const inviteRoutes = require('./routes/invite');
+const adminRoutes = require('./routes/admin');
 const db = require('./db');
 
 const app = express();
@@ -27,6 +29,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api', inviteRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as api from './api';
 import ReminderForm from './ReminderForm';
 
 const styles = {
@@ -48,11 +49,17 @@ function todayStr() {
   return new Date().toLocaleDateString('ar-EG', { dateStyle: 'short' });
 }
 
-export default function RemindersList({ user, reminders, error, onLogout, onRefresh, onClearFired, onTestNotification, pushStatus, pushFailReason, onRetryPush, onAdd, onUpdate, onDelete }) {
+export default function RemindersList({ user, reminders, error, isAdmin, onLogout, onRefresh, onError, onClearFired, onTestNotification, pushStatus, pushFailReason, onRetryPush, onAdd, onUpdate, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [openNotesId, setOpenNotesId] = useState(null);
   const [notesDraft, setNotesDraft] = useState({});
+  const [inviteModal, setInviteModal] = useState(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [blockedModal, setBlockedModal] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState([]);
+  const [blockUserModal, setBlockUserModal] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
 
   const handleSave = async (payload) => {
     if (editing) {
@@ -64,11 +71,73 @@ export default function RemindersList({ user, reminders, error, onLogout, onRefr
     }
   };
 
+  const handleCreateInvite = async () => {
+    if (inviteLoading) return;
+    setInviteLoading(true);
+    if (onError) onError('');
+    try {
+      const data = await api.createInviteLink();
+      const link = window.location.origin + '/invite/' + (data.token || '');
+      setInviteModal({ link, copied: false });
+    } catch (e) {
+      if (onError) onError(e.message || 'فشل إنشاء الرابط');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const copyInviteLink = () => {
+    if (inviteModal?.link) {
+      navigator.clipboard?.writeText(inviteModal.link).then(() => setInviteModal((p) => (p ? { ...p, copied: true } : null)));
+    }
+  };
+
+  const loadBlocked = async () => {
+    try {
+      const list = await api.getBlockedUsers();
+      setBlockedUsers(list);
+    } catch (_) {}
+  };
+
+  const loadAllUsers = async () => {
+    try {
+      const list = await api.getAllUsers();
+      setAllUsers(list);
+    } catch (_) {}
+  };
+
+  const handleBlock = async (targetId) => {
+    if (!confirm('إيقاف وصول هذا المستخدم؟')) return;
+    try {
+      await api.blockUser(targetId);
+      setBlockedUsers((prev) => [...prev, allUsers.find((u) => u.id === targetId)].filter(Boolean));
+      setAllUsers((prev) => prev.filter((u) => u.id !== targetId));
+    } catch (e) {
+      if (onError) onError(e.message || 'فشل');
+    }
+  };
+
+  const handleUnblock = async (targetId) => {
+    try {
+      await api.unblockUser(targetId);
+      setBlockedUsers((prev) => prev.filter((u) => u.id !== targetId));
+    } catch (e) {
+      if (onError) onError(e.message || 'فشل');
+    }
+  };
+
   return (
     <div style={styles.page}>
       <header style={styles.header}>
         <h1 style={styles.title}>Karas — تنبيهات</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {isAdmin && (
+            <>
+              <button style={{ ...styles.btn, background: 'var(--primary)' }} onClick={handleCreateInvite} disabled={inviteLoading}>{inviteLoading ? '...' : 'رابط دعوة'}</button>
+              <button style={styles.btn} onClick={() => { setBlockedModal(true); loadBlocked(); }}>الموقوفون</button>
+              <button style={styles.btn} onClick={() => { setBlockUserModal(true); loadAllUsers(); loadBlocked(); }}>إيقاف مستخدم</button>
+            </>
+          )}
           <button style={styles.btn} onClick={onRefresh}>تحديث</button>
           <button style={styles.btn} onClick={onLogout}>خروج</button>
         </div>
@@ -190,6 +259,63 @@ export default function RemindersList({ user, reminders, error, onLogout, onRefr
           );
         })}
       </div>
+
+      {inviteModal && (
+        <div onClick={() => setInviteModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%' }}>
+            <h3 style={{ marginTop: 0 }}>رابط دعوة — للآيفون والأندرويد</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>الرابط يعمل مرة واحدة ولا يُعاد إرساله.</p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button type="button" onClick={handleCreateInvite} disabled={inviteLoading} style={{ flex: 1, padding: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer' }}>{inviteLoading ? '...' : '📱 للآيفون'}</button>
+              <button type="button" onClick={handleCreateInvite} disabled={inviteLoading} style={{ flex: 1, padding: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer' }}>{inviteLoading ? '...' : '🤖 للأندرويد'}</button>
+            </div>
+            {inviteModal.link && (
+              <>
+                <input type="text" readOnly value={inviteModal.link} style={{ width: '100%', padding: 10, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', marginBottom: 12 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={copyInviteLink} style={{ flex: 1, padding: 10, background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>{inviteModal.copied ? 'تم النسخ ✓' : 'نسخ'}</button>
+                  <button type="button" onClick={() => setInviteModal(null)} style={{ padding: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إغلاق</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {blockedModal && (
+        <div onClick={() => setBlockedModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
+            <h3 style={{ marginTop: 0 }}>المستخدمون الموقوفون</h3>
+            {blockedUsers.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>لا يوجد موقوفون</p> : blockedUsers.map((u) => (
+              <div key={u.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{u.name || u.email || '—'}</span>
+                <button type="button" onClick={() => handleUnblock(u.id)} style={{ padding: '6px 12px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 12 }}>إعادة التفعيل</button>
+              </div>
+            ))}
+            <button type="button" onClick={() => setBlockedModal(false)} style={{ marginTop: 12, padding: '8px 16px' }}>إغلاق</button>
+          </div>
+        </div>
+      )}
+
+      {blockUserModal && (
+        <div onClick={() => setBlockUserModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
+            <h3 style={{ marginTop: 0 }}>إيقاف مستخدم</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>اختر المستخدم لإيقاف وصوله</p>
+            {allUsers.filter((u) => u.id !== user?.id && !blockedUsers.some((b) => b.id === u.id)).length === 0 ? (
+              <p style={{ color: 'var(--text-muted)' }}>لا يوجد مستخدمون آخرون</p>
+            ) : (
+              allUsers.filter((u) => u.id !== user?.id && !blockedUsers.some((b) => b.id === u.id)).map((u) => (
+                <div key={u.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{u.name || u.email || '—'}</span>
+                  <button type="button" onClick={() => handleBlock(u.id)} style={{ padding: '6px 12px', background: 'rgba(248,81,73,0.3)', color: '#f85149', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>إيقاف</button>
+                </div>
+              ))
+            )}
+            <button type="button" onClick={() => setBlockUserModal(false)} style={{ marginTop: 12, padding: '8px 16px' }}>إغلاق</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

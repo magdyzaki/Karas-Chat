@@ -29,7 +29,11 @@ router.post('/register', async (req, res) => {
       token
     });
   } catch (e) {
-    return res.status(500).json({ error: e.message || 'خطأ في التسجيل' });
+    const msg = e.message || '';
+    const isDbError = /SSL|TLS|0A000438|openssl|tlsv1/i.test(msg);
+    return res.status(500).json({
+      error: isDbError ? 'خطأ في الاتصال بقاعدة البيانات. جرّب بعد دقائق أو راجع إعدادات السيرفر (Node 18 و MONGODB_URI).' : (msg || 'خطأ في التسجيل')
+    });
   }
 });
 
@@ -43,10 +47,17 @@ router.post('/login', async (req, res) => {
     if (!row || !bcrypt.compareSync(password.trim(), row.password_hash)) {
       return res.status(401).json({ error: 'البريد أو كلمة المرور غير صحيحة' });
     }
+    if (await db.isUserBlocked(row.id)) {
+      return res.status(403).json({ error: 'تم إيقاف وصولك من قبل المسؤول' });
+    }
     const token = jwt.sign({ userId: row.id }, JWT_SECRET, { expiresIn: '30d' });
     res.json({ user: { id: row.id, email: row.email, name: row.name }, token });
   } catch (e) {
-    return res.status(500).json({ error: e.message || 'خطأ في الدخول' });
+    const msg = e.message || '';
+    const isDbError = /SSL|TLS|0A000438|openssl|tlsv1/i.test(msg);
+    return res.status(500).json({
+      error: isDbError ? 'خطأ في الاتصال بقاعدة البيانات. جرّب بعد دقائق أو راجع إعدادات السيرفر (Node 18 و MONGODB_URI).' : (msg || 'خطأ في الدخول')
+    });
   }
 });
 

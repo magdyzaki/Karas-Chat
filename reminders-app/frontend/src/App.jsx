@@ -3,6 +3,15 @@ import { requestNotificationPermission, showReminderNotification, subscribeToPus
 import * as api from './api';
 import Login from './Login';
 import RemindersList from './RemindersList';
+import InvitePage from './InvitePage';
+
+const ADMIN_IDS = (import.meta.env.VITE_ADMIN_USER_IDS || '1').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
+const isAdmin = (userId) => userId && ADMIN_IDS.length > 0 && ADMIN_IDS.includes(Number(userId));
+
+function parseInviteToken() {
+  const m = window.location.pathname.match(/^\/invite\/([a-zA-Z0-9_]+)/);
+  return m ? m[1] : null;
+}
 
 const POLL_MS = 60 * 1000; // كل دقيقة جلب من السيرفر
 const CHECK_INTERVAL_MS = 2 * 1000; // كل 2 ثانية (موبايل يبطّئ الفواصل فنجعلها قصيرة)
@@ -15,6 +24,7 @@ function App() {
   const [lastFired, setLastFired] = useState(null); // تنبيه ظهر الآن (داخل الصفحة لو الإشعار مرفوض)
   const [pushStatus, setPushStatus] = useState(null); // null | 'ok' | 'fail'
   const [pushFailReason, setPushFailReason] = useState(''); // سبب فشل الاشتراك في Push
+  const [inviteToken, setInviteToken] = useState(() => parseInviteToken());
   const [firedIds, setFiredIds] = useState(() => {
     try {
       return new Set(JSON.parse(localStorage.getItem('reminders_fired') || '[]'));
@@ -240,6 +250,15 @@ function App() {
     });
   };
 
+  const handleInviteValid = () => {
+    setInviteToken(null);
+    window.history.replaceState({}, '', '/');
+  };
+
+  if (inviteToken) {
+    return <InvitePage token={inviteToken} onValid={handleInviteValid} />;
+  }
+
   if (loading && !user) {
     return (
       <div style={{ padding: 24, textAlign: 'center' }}>
@@ -278,7 +297,9 @@ function App() {
         user={user}
         reminders={reminders}
         error={error}
+        isAdmin={isAdmin(user?.id)}
         onLogout={handleLogout}
+        onError={(msg) => setError(msg || '')}
         onRefresh={fetchReminders}
         onClearFired={() => {
           localStorage.removeItem('reminders_fired');

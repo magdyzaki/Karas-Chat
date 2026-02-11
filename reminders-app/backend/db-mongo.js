@@ -8,15 +8,23 @@ const DB_NAME = 'reminders';
 const COL_USERS = 'users';
 const COL_REMINDERS = 'reminders';
 const COL_PUSH = 'push_subscriptions';
+const COL_INVITE_LINKS = 'invite_links';
+const COL_BLOCKED = 'blocked_user_ids';
 
 let client = null;
 let db = null;
 
 async function getDb() {
   if (db) return db;
-  const uri = process.env.MONGODB_URI;
+  const uri = (process.env.MONGODB_URI || '').trim();
   if (!uri) throw new Error('MONGODB_URI مطلوب لاستخدام MongoDB');
-  client = new MongoClient(uri);
+  // خيارات لتجنب خطأ SSL (tlsv1 alert internal error) على بعض السيرفرات مثل Koyeb
+  const options = {
+    serverSelectionTimeoutMS: 20000,
+    autoSelectFamily: false,
+    family: 4
+  };
+  client = new MongoClient(uri, options);
   await client.connect();
   db = client.db(DB_NAME);
   return db;
@@ -188,6 +196,56 @@ remind_at: new Date(remind_at),
       reminders_count: remindersCount,
       due_not_notified_count: due.length
     };
+  },
+
+  async createInviteLink(userId) {
+    const d = await getDb();
+    const token = 'i_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    const row = { token, created_by: Number(userId), created_at: now(), used_at: null };
+    await d.collection(COL_INVITE_LINKS).insertOne(row);
+    return row;
+  },
+  async consumeInviteLink(token) {
+    const d = await getDb();
+    const row = await d.collection(COL_INVITE_LINKS).findOne({ token, used_at: null });
+    if (!row) return false;
+    await d.collection(COL_INVITE_LINKS).updateOne({ token }, { $set: { used_at: now() } });
+    return true;
+  },
+  async getInviteLink(token) {
+    const d = await getDb();
+    return d.collection(COL_INVITE_LINKS).findOne({ token });
+  },
+  async blockUser(userId) {
+    const d = await getDb();
+    const id = Number(userId);
+    if (!id) return false;
+    const existing = await d.collection(COL_BLOCKED).findOne({ user_id: id });
+    if (existing) return false;
+    await d.collection(COL_BLOCKED).insertOne({ user_id: id });
+    return true;
+  },
+  async unblockUser(userId) {
+    const d = await getDb();
+    await d.collection(COL_BLOCKED).deleteMany({ user_id: Number(userId) });
+    return true;
+  },
+  async isUserBlocked(userId) {
+    const d = await getDb();
+    const doc = await d.collection(COL_BLOCKED).findOne({ user_id: Number(userId) });
+    return !!doc;
+  },
+  async getBlockedUsers() {
+    const d = await getDb();
+    const blocked = await d.collection(COL_BLOCKED).find({}).toArray();
+    const ids = blocked.map((b) => b.user_id);
+    const users = await d.collection(COL_USERS).find({ id: { $in: ids } }).toArray();
+    return users.map((u) => ({ id: u.id, email: u.email, name: u.name }));
+  },
+  async getAllUsers() {
+    const d = await getDb();
+    const users = await d.collection(COL_USERS).find({}).project({ id: 1, email: 1, name: 1 }).toArray();
+    return users.map((u) => ({ id: u.id, email: u.email, name: u.name }));
   }
 };
 

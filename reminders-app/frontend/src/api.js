@@ -91,3 +91,56 @@ export async function subscribePush(subscription) {
   if (!res.ok) throw new Error(data.error || 'فشل تسجيل الاشتراك');
   return data;
 }
+
+export async function createInviteLink() {
+  const res = await fetch(`${API_BASE}/api/invite-links`, { method: 'POST', headers: headers() });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إنشاء الرابط');
+  return data;
+}
+
+export async function checkInviteLink(token) {
+  const res = await fetch(`${API_BASE}/api/check-invite/${encodeURIComponent(token)}`);
+  return res.json().catch(() => ({}));
+}
+
+export async function consumeInviteLink(token) {
+  const res = await fetch(`${API_BASE}/api/consume-invite/${encodeURIComponent(token)}`, { method: 'POST' });
+  return res.json().catch(() => ({}));
+}
+
+export async function blockUser(targetUserId) {
+  const res = await fetch(`${API_BASE}/api/admin/block-user`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ targetUserId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إيقاف المستخدم');
+  return data;
+}
+
+export async function unblockUser(targetUserId) {
+  const res = await fetch(`${API_BASE}/api/admin/unblock-user`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ targetUserId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إعادة التفعيل');
+  return data;
+}
+
+export async function getBlockedUsers() {
+  const res = await fetch(`${API_BASE}/api/admin/blocked-users`, { headers: headers() });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل جلب القائمة');
+  return data.users || [];
+}
+
+export async function getAllUsers() {
+  const res = await fetch(`${API_BASE}/api/admin/all-users`, { headers: headers() });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل جلب المستخدمين');
+  return data.users || [];
+}

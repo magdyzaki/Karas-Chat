@@ -1,6 +1,6 @@
 /**
- * واجهة التخزين: إذا وُجد MONGODB_URI نستخدم MongoDB (تخزين دائم على السحابة).
- * وإلا نستخدم الملف (lowdb) — مع تحذير إذا كان السيرفر يعمل بدون DB_PATH.
+ * واجهة التخزين: إذا وُجد MONGODB_URI نستخدم MongoDB (تخزين دائم).
+ * وإلا نستخدم الملف (lowdb).
  */
 const dbLowdb = require('./db-lowdb');
 const path = require('path');

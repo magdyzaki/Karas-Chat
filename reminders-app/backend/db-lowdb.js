@@ -17,10 +17,18 @@ try {
 } catch (_) {}
 
 const adapter = new JSONFileSync(dbPath);
-const low = new LowSync(adapter, { users: [], reminders: [], push_subscriptions: [] });
+const low = new LowSync(adapter, { users: [], reminders: [], push_subscriptions: [], invite_links: [], blocked_user_ids: [] });
 low.read();
 if (!Array.isArray(low.data.push_subscriptions)) {
   low.data.push_subscriptions = [];
+  low.write();
+}
+if (!Array.isArray(low.data.invite_links)) {
+  low.data.invite_links = [];
+  low.write();
+}
+if (!Array.isArray(low.data.blocked_user_ids)) {
+  low.data.blocked_user_ids = [];
   low.write();
 }
 low.read();
@@ -163,6 +171,54 @@ const db = {
       reminders_count: (low.data.reminders || []).length,
       due_not_notified_count: due.length
     };
+  },
+
+  createInviteLink(userId) {
+    low.read();
+    const token = 'i_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    const row = { token, created_by: Number(userId), created_at: now(), used_at: null };
+    low.data.invite_links.push(row);
+    low.write();
+    return row;
+  },
+  consumeInviteLink(token) {
+    low.read();
+    const row = low.data.invite_links.find((l) => l.token === token && !l.used_at);
+    if (!row) return false;
+    row.used_at = now();
+    low.write();
+    return true;
+  },
+  getInviteLink(token) {
+    low.read();
+    return low.data.invite_links.find((l) => l.token === token);
+  },
+  blockUser(userId) {
+    low.read();
+    const id = Number(userId);
+    if (!id || low.data.blocked_user_ids.includes(id)) return false;
+    low.data.blocked_user_ids.push(id);
+    low.write();
+    return true;
+  },
+  unblockUser(userId) {
+    low.read();
+    const id = Number(userId);
+    low.data.blocked_user_ids = low.data.blocked_user_ids.filter((x) => x !== id);
+    low.write();
+    return true;
+  },
+  isUserBlocked(userId) {
+    low.read();
+    return low.data.blocked_user_ids.includes(Number(userId));
+  },
+  getBlockedUsers() {
+    low.read();
+    return low.data.blocked_user_ids.map((id) => low.data.users.find((u) => u.id === id)).filter(Boolean);
+  },
+  getAllUsers() {
+    low.read();
+    return low.data.users.map((u) => ({ id: u.id, email: u.email, name: u.name }));
   }
 };
 
