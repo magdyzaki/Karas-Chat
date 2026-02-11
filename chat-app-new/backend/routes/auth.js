@@ -37,6 +37,7 @@ router.post('/login', async (req, res) => {
   if (!emailOrPhone || !password) return res.status(400).json({ error: 'البريد أو رقم الموبايل وكلمة المرور مطلوبان' });
   const user = db.findUserByEmailOrPhone(emailOrPhone);
   if (!user) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
+  if (db.isUserBlocked(user.id)) return res.status(403).json({ error: 'تم إيقاف وصولك من قبل المسؤول' });
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });

@@ -12,15 +12,20 @@ const low = new LowSync(adapter, {
   conversation_members: [],
   messages: [],
   conversation_reads: [],
-  invite_links: []
+  invite_links: [],
+  blocked_user_ids: []
 });
 low.read();
 if (!low.data || !Array.isArray(low.data.users)) {
-  low.data = { users: [], conversations: [], conversation_members: [], messages: [], conversation_reads: [], invite_links: [] };
+  low.data = { users: [], conversations: [], conversation_members: [], messages: [], conversation_reads: [], invite_links: [], blocked_user_ids: [] };
   low.write();
 }
 if (!Array.isArray(low.data.invite_links)) {
   low.data.invite_links = [];
+  low.write();
+}
+if (!Array.isArray(low.data.blocked_user_ids)) {
+  low.data.blocked_user_ids = [];
   low.write();
 }
 if (!Array.isArray(low.data.conversation_reads)) {
@@ -280,5 +285,29 @@ export const db = {
   getInviteLink(token) {
     low.read();
     return low.data.invite_links.find((l) => l.token === token);
+  },
+
+  blockUser(userId) {
+    low.read();
+    const id = Number(userId);
+    if (!id || low.data.blocked_user_ids.includes(id)) return false;
+    low.data.blocked_user_ids.push(id);
+    low.write();
+    return true;
+  },
+  unblockUser(userId) {
+    low.read();
+    const id = Number(userId);
+    low.data.blocked_user_ids = low.data.blocked_user_ids.filter((x) => x !== id);
+    low.write();
+    return true;
+  },
+  isUserBlocked(userId) {
+    low.read();
+    return low.data.blocked_user_ids.includes(Number(userId));
+  },
+  getBlockedUsers() {
+    low.read();
+    return low.data.blocked_user_ids.map((id) => db.findUserById(id)).filter(Boolean);
   }
 };

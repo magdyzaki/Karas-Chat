@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import convRoutes from './routes/conversations.js';
 import inviteRoutes from './routes/invite.js';
+import adminRoutes from './routes/admin.js';
 import { jwtVerify } from './middleware/auth.js';
 import { upload } from './middleware/upload.js';
 
@@ -30,6 +31,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', jwtVerify, userRoutes);
 app.use('/api/conversations', jwtVerify, convRoutes);
 app.use('/api', inviteRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.post('/api/upload', jwtVerify, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'لم يُرفع ملف' });
@@ -47,6 +49,7 @@ io.use((socket, next) => {
   if (!token) return next(new Error('غير مصرح'));
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return next(new Error('رمز غير صالح'));
+    if (db.isUserBlocked(decoded.userId)) return next(new Error('تم إيقاف وصولك'));
     socket.userId = decoded.userId;
     next();
   });

@@ -25,6 +25,8 @@ function App() {
   const [inviteToken, setInviteToken] = useState(() => parseInviteToken());
   const [inviteLinkModal, setInviteLinkModal] = useState(null); // { link, copied? }
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState([]);
 
   const token = localStorage.getItem('chat_token');
   const savedUser = localStorage.getItem('chat_user');
@@ -125,6 +127,35 @@ function App() {
     }
   };
 
+  const handleBlockUser = async (targetUserId) => {
+    if (!confirm('هل تريد إيقاف وصول هذا المستخدم؟ لن يستطيع فتح التطبيق مرة أخرى حتى تعيد تفعيله.')) return;
+    try {
+      await api.blockUser(targetUserId);
+      setError('');
+      loadConversations();
+      setCurrentConvId(null);
+    } catch (e) {
+      setError(e.message || 'فشل إيقاف المستخدم');
+    }
+  };
+
+  const loadBlockedUsers = useCallback(async () => {
+    if (!isAdmin(user?.id)) return;
+    try {
+      const list = await api.getBlockedUsers();
+      setBlockedUsers(list);
+    } catch (_) {}
+  }, [user?.id]);
+
+  const handleUnblockUser = async (targetUserId) => {
+    try {
+      await api.unblockUser(targetUserId);
+      setBlockedUsers((prev) => prev.filter((u) => u.id !== targetUserId));
+    } catch (e) {
+      setError(e.message || 'فشل إعادة التفعيل');
+    }
+  };
+
   const handleCreateGroup = async (name, memberIds) => {
     try {
       setError('');
@@ -156,8 +187,8 @@ function App() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {isAdmin(user?.id) && (
             <>
-              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ padding: '6px 10px', background: inviteLoading ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 12 }}>{inviteLoading ? '...' : 'رابط للآيفون'}</button>
-              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ padding: '6px 10px', background: inviteLoading ? 'var(--text-muted)' : 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 12 }}>{inviteLoading ? '...' : 'رابط للأندرويد'}</button>
+              <button type="button" onClick={() => { setShowBlockedModal(true); loadBlockedUsers(); }} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 12 }}>الموقوفون</button>
+              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ padding: '6px 10px', background: inviteLoading ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 12 }}>{inviteLoading ? '...' : 'رابط دعوة'}</button>
             </>
           )}
           <button type="button" onClick={handleLogout} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>خروج</button>
@@ -184,6 +215,8 @@ function App() {
               socket={socket}
               currentUserId={user.id}
               onBack={() => setCurrentConvId(null)}
+              isAdmin={isAdmin(user?.id)}
+              onBlockUser={handleBlockUser}
             />
           ) : (
             <div className="chat-placeholder" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>اختر محادثة أو ابدأ محادثة جديدة</div>
@@ -193,14 +226,40 @@ function App() {
       {inviteLinkModal && (
         <div onClick={() => setInviteLinkModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%' }}>
-            <h3 style={{ marginTop: 0 }}>رابط دعوة — يستخدم مرة واحدة ولا يُعاد إرساله</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>أرسل للشخص فقط. من يفتحه أولاً يستخدمه — ولا يعمل بعده لأحد. الصديق لا يقدر يبعته لشخص آخر.</p>
-            <input type="text" readOnly value={inviteLinkModal.link} style={{ width: '100%', padding: 10, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', marginBottom: 12 }} />
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" onClick={copyInviteLink} style={{ flex: 1, minWidth: 100, padding: 10, background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>{inviteLinkModal.copied ? 'تم النسخ ✓' : 'نسخ الرابط'}</button>
-              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ flex: 1, minWidth: 100, padding: 10, background: inviteLoading ? 'var(--text-muted)' : 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer' }}>{inviteLoading ? '...' : 'رابط جديد'}</button>
-              <button type="button" onClick={() => setInviteLinkModal(null)} style={{ padding: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إغلاق</button>
+            <h3 style={{ marginTop: 0 }}>رابط دعوة — للآيفون والأندرويد</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>الرابط يعمل على الجهازين. استخدمه مرة واحدة ولا يُعاد إرساله.</p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ flex: 1, padding: 10, background: inviteLoading ? 'var(--text-muted)' : 'rgba(0,0,0,0.1)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 14 }}>{inviteLoading ? '...' : '📱 للآيفون'}</button>
+              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ flex: 1, padding: 10, background: inviteLoading ? 'var(--text-muted)' : 'rgba(0,0,0,0.1)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 14 }}>{inviteLoading ? '...' : '🤖 للأندرويد'}</button>
             </div>
+            {inviteLinkModal.link && (
+              <>
+                <input type="text" readOnly value={inviteLinkModal.link} style={{ width: '100%', padding: 10, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', marginBottom: 12 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={copyInviteLink} style={{ flex: 1, padding: 10, background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>{inviteLinkModal.copied ? 'تم النسخ ✓' : 'نسخ الرابط'}</button>
+                  <button type="button" onClick={() => setInviteLinkModal(null)} style={{ padding: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إغلاق</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {showBlockedModal && isAdmin(user?.id) && (
+        <div onClick={() => setShowBlockedModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
+            <h3 style={{ marginTop: 0 }}>المستخدمون الموقوفون</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>يمكنك إعادة تفعيل أي شخص من هنا</p>
+            {blockedUsers.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)' }}>لا يوجد موقوفون</p>
+            ) : (
+              blockedUsers.map((u) => (
+                <div key={u.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{u.name || u.phone || u.email || '—'}</span>
+                  <button type="button" onClick={() => handleUnblockUser(u.id)} style={{ padding: '6px 12px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 12 }}>إعادة التفعيل</button>
+                </div>
+              ))
+            )}
+            <button type="button" onClick={() => setShowBlockedModal(false)} style={{ marginTop: 12, padding: '8px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إغلاق</button>
           </div>
         </div>
       )}

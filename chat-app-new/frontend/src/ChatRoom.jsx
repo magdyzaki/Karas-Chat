@@ -39,7 +39,7 @@ const s = {
   copyBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' }
 };
 
-export default function ChatRoom({ conversation, socket, currentUserId, onBack }) {
+export default function ChatRoom({ conversation, socket, currentUserId, onBack, isAdmin, onBlockUser }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -481,6 +481,9 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack }
         <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{conversation.label || conversation.name || 'محادثة'}</span>
         {isDirectTwo && callState === 'idle' && (
           <>
+            {isAdmin && onBlockUser && otherUserId && (
+              <button type="button" style={{ ...s.voiceBtn, background: 'rgba(248,81,73,0.2)', color: '#f85149' }} onClick={() => onBlockUser(otherUserId)} title="إيقاف وصوله">⏹</button>
+            )}
             <button type="button" style={s.voiceBtn} onClick={() => startCall(false)} title="مكالمة صوتية">📞</button>
             <button type="button" style={s.voiceBtn} onClick={() => startCall(true)} title="مكالمة فيديو">📹</button>
           </>

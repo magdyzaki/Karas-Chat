@@ -142,3 +142,32 @@ export async function consumeInviteLink(token) {
   const data = await res.json().catch(() => ({}));
   return data;
 }
+
+export async function blockUser(targetUserId) {
+  const res = await fetch(`${API_BASE}/api/admin/block-user`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ targetUserId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إيقاف المستخدم');
+  return data;
+}
+
+export async function unblockUser(targetUserId) {
+  const res = await fetch(`${API_BASE}/api/admin/unblock-user`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ targetUserId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إعادة التفعيل');
+  return data;
+}
+
+export async function getBlockedUsers() {
+  const res = await fetch(`${API_BASE}/api/admin/blocked-users`, { headers: headers() });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل جلب القائمة');
+  return data.users || [];
+}

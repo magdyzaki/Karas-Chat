@@ -11,6 +11,7 @@ export function jwtVerify(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = db.findUserById(decoded.userId);
     if (!user) return res.status(401).json({ error: 'المستخدم غير موجود' });
+    if (db.isUserBlocked(user.id)) return res.status(403).json({ error: 'تم إيقاف وصولك من قبل المسؤول' });
     req.userId = user.id;
     next();
   } catch (_) {
