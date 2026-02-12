@@ -188,6 +188,40 @@ function App() {
     }
   };
 
+  const handleLeaveGroup = async (convId) => {
+    try {
+      await api.leaveGroup(convId);
+      setConversations((prev) => prev.filter((c) => c.id !== convId));
+      setCurrentConvId(null);
+      loadConversations();
+    } catch (e) {
+      setError(e.message || 'فشل مغادرة المجموعة');
+    }
+  };
+
+  const handleDeleteGroup = async (convId) => {
+    if (!confirm('هل أنت متأكد من حذف المجموعة نهائياً؟')) return;
+    try {
+      await api.deleteGroup(convId);
+      setConversations((prev) => prev.filter((c) => c.id !== convId));
+      setCurrentConvId(null);
+      loadConversations();
+    } catch (e) {
+      setError(e.message || 'فشل حذف المجموعة');
+    }
+  };
+
+  const handleRemoveMember = async (convId, targetUserId) => {
+    if (!confirm('هل تريد طرد هذا العضو من المجموعة؟')) return;
+    try {
+      await api.removeMemberFromGroup(convId, targetUserId);
+      const updated = await api.getConversation(convId);
+      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, memberIds: updated.memberIds || c.memberIds, memberDetails: updated.memberDetails || c.memberDetails } : c)));
+    } catch (e) {
+      setError(e.message || 'فشل طرد العضو');
+    }
+  };
+
   const handleCreateGroup = async (name, memberIds) => {
     try {
       setError('');
@@ -306,6 +340,9 @@ function App() {
               onBack={() => setCurrentConvId(null)}
               isAdmin={isAdmin(user?.id)}
               onBlockUser={handleBlockUser}
+              onLeaveGroup={handleLeaveGroup}
+              onDeleteGroup={handleDeleteGroup}
+              onRemoveMember={handleRemoveMember}
             />
           ) : (
             <div className="chat-placeholder" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>اختر محادثة أو ابدأ محادثة جديدة</div>

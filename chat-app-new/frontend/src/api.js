@@ -113,6 +113,37 @@ export async function createGroupConversation(name, memberIds) {
   return data;
 }
 
+export async function leaveGroup(conversationId) {
+  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/leave`, {
+    method: 'POST',
+    headers: headers()
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل مغادرة المجموعة');
+  return data;
+}
+
+export async function deleteGroup(conversationId) {
+  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}`, {
+    method: 'DELETE',
+    headers: headers()
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل حذف المجموعة');
+  return data;
+}
+
+export async function removeMemberFromGroup(conversationId, targetUserId) {
+  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/remove-member`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ targetUserId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل طرد العضو');
+  return data;
+}
+
 export async function uploadFile(file) {
   const form = new FormData();
   form.append('file', file);

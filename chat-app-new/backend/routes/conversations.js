@@ -27,7 +27,7 @@ router.get('/:id', (req, res) => {
     const u = db.findUserById(id);
     return u ? { id: u.id, name: u.name, email: u.email, phone: u.phone, avatar_url: u.avatar_url || null } : { id, name: '', avatar_url: null };
   });
-  res.json({ ...conv, memberDetails });
+  res.json({ ...conv, memberIds, memberDetails });
 });
 
 router.get('/:id/messages', (req, res) => {
@@ -76,6 +76,33 @@ router.post('/group', (req, res) => {
   const conv = db.createGroupConversation(req.userId, name, Array.isArray(memberIds) ? memberIds : []);
   const memberIdsList = db.getMemberIds(conv.id);
   res.json({ ...conv, label: conv.name, memberIds: memberIdsList });
+});
+
+router.post('/:id/leave', (req, res) => {
+  const conv = db.getConversationByIdAndUser(req.params.id, req.userId);
+  if (!conv) return res.status(404).json({ error: 'المحادثة غير موجودة' });
+  if (conv.type === 'direct') return res.status(400).json({ error: 'لا يمكن مغادرة محادثة فردية' });
+  const ok = db.leaveConversation(conv.id, req.userId);
+  if (!ok) return res.status(400).json({ error: 'فشل مغادرة المجموعة' });
+  res.json({ ok: true });
+});
+
+router.delete('/:id', (req, res) => {
+  const conv = db.getConversationByIdAndUser(req.params.id, req.userId);
+  if (!conv) return res.status(404).json({ error: 'المحادثة غير موجودة' });
+  const ok = db.deleteConversation(conv.id, req.userId);
+  if (!ok) return res.status(403).json({ error: 'فقط منشئ المجموعة يمكنه حذفها' });
+  res.json({ ok: true });
+});
+
+router.post('/:id/remove-member', (req, res) => {
+  const { targetUserId } = req.body || {};
+  if (!targetUserId) return res.status(400).json({ error: 'معرف العضو مطلوب' });
+  const conv = db.getConversationByIdAndUser(req.params.id, req.userId);
+  if (!conv) return res.status(404).json({ error: 'المحادثة غير موجودة' });
+  const ok = db.removeMemberFromGroup(conv.id, req.userId, targetUserId);
+  if (!ok) return res.status(403).json({ error: 'فقط منشئ المجموعة يمكنه طرد الأعضاء' });
+  res.json({ ok: true });
 });
 
 export default router;

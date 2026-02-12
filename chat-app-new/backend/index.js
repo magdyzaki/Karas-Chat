@@ -51,6 +51,7 @@ const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => console.log('Chat backend on', PORT));
 
 const userSockets = new Map();
+const activeGroupCalls = new Map();
 
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
@@ -179,10 +180,75 @@ io.on('connection', (socket) => {
     socket.to('conv_' + conversationId).emit('call_ended', { conversationId: Number(conversationId) });
   });
 
+  socket.on('start_group_call', (data) => {
+    const { conversationId } = data || {};
+    if (!conversationId) return;
+    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    if (!conv || conv.type !== 'group' || !conv.members || conv.members.length < 2) return;
+    const cid = Number(conversationId);
+    if (!activeGroupCalls.has(cid)) activeGroupCalls.set(cid, new Set());
+    activeGroupCalls.get(cid).add(uid);
+    const user = db.findUserById(uid);
+    const payload = {
+      conversationId: cid,
+      initiatorId: uid,
+      initiatorName: user ? user.name || user.email || user.phone : 'شخص',
+      participants: Array.from(activeGroupCalls.get(cid))
+    };
+    socket.emit('group_call_started', payload);
+    socket.to('conv_' + cid).emit('group_call_started', payload);
+  });
+
+  socket.on('join_group_call', (data) => {
+    const { conversationId } = data || {};
+    if (!conversationId) return;
+    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    if (!conv) return;
+    const cid = Number(conversationId);
+    if (!activeGroupCalls.has(cid)) return;
+    const participants = activeGroupCalls.get(cid);
+    participants.add(uid);
+    const user = db.findUserById(uid);
+    io.to('conv_' + cid).emit('group_call_user_joined', {
+      conversationId: cid,
+      userId: uid,
+      userName: user ? user.name || user.email || user.phone : 'شخص',
+      participants: Array.from(participants)
+    });
+    socket.emit('group_call_you_joined', {
+      conversationId: cid,
+      participants: Array.from(participants).filter((id) => id !== uid)
+    });
+  });
+
+  socket.on('leave_group_call', (data) => {
+    const { conversationId } = data || {};
+    if (!conversationId) return;
+    const cid = Number(conversationId);
+    if (!activeGroupCalls.has(cid)) return;
+    const participants = activeGroupCalls.get(cid);
+    participants.delete(uid);
+    if (participants.size === 0) {
+      activeGroupCalls.delete(cid);
+    }
+    io.to('conv_' + cid).emit('group_call_user_left', {
+      conversationId: cid,
+      userId: uid,
+      participants: Array.from(participants)
+    });
+  });
+
   socket.on('disconnect', () => {
     if (userSockets.has(uid)) {
       userSockets.get(uid).delete(socket.id);
       if (userSockets.get(uid).size === 0) userSockets.delete(uid);
+    }
+    for (const [cid, participants] of activeGroupCalls.entries()) {
+      if (participants.has(uid)) {
+        participants.delete(uid);
+        if (participants.size === 0) activeGroupCalls.delete(cid);
+        io.to('conv_' + cid).emit('group_call_user_left', { conversationId: cid, userId: uid, participants: Array.from(participants) });
+      }
     }
   });
 });

@@ -10,7 +10,7 @@ const s = {
   msg: { maxWidth: '80%', padding: '10px 14px', borderRadius: 12, alignSelf: 'flex-start', wordBreak: 'break-word' },
   msgOwn: { alignSelf: 'flex-end', background: 'var(--msg-bg-own, var(--primary))', color: '#fff' },
   msgOther: { background: 'var(--msg-bg-other, var(--surface))', border: '1px solid var(--border)' },
-  msgMeta: { fontSize: 11, opacity: 0.8, marginTop: 4 },
+  msgMeta: { fontSize: 11, color: 'var(--msg-action-color, #4a5568)', marginTop: 4 },
   replyBar: { fontSize: 12, opacity: 0.9, padding: '6px 10px', borderRight: '3px solid var(--primary)', marginBottom: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 4 },
   form: { padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' },
   input: { flex: 1, minWidth: 120, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 15, minHeight: 44, textAlign: 'right' },
@@ -21,8 +21,8 @@ const s = {
   link: { color: 'var(--primary)', wordBreak: 'break-all' },
   typingBar: { padding: '4px 12px', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' },
   replyPreview: { padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 6, marginBottom: 6, fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  replyBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' },
-  deleteBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11, padding: '2px 6px' },
+  replyBtn: { background: 'none', border: 'none', color: 'var(--msg-action-color, #4a5568)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' },
+  deleteBtn: { background: 'none', border: 'none', color: 'var(--msg-action-color, #4a5568)', cursor: 'pointer', fontSize: 11, padding: '2px 6px' },
   voiceBtn: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontSize: 16 },
   audio: { maxWidth: '100%', minWidth: 200, marginTop: 4 },
   callModal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 },
@@ -36,10 +36,10 @@ const s = {
   searchRow: { padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center' },
   searchInput: { flex: 1, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 14 },
   loadMoreBtn: { padding: '8px 16px', margin: '8px auto', display: 'block', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 },
-  copyBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' }
+  copyBtn: { background: 'none', border: 'none', color: 'var(--msg-action-color, #4a5568)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' }
 };
 
-export default function ChatRoom({ conversation, socket, currentUserId, onBack, isAdmin, onBlockUser }) {
+export default function ChatRoom({ conversation, socket, currentUserId, onBack, isAdmin, onBlockUser, onLeaveGroup, onDeleteGroup, onRemoveMember }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -76,6 +76,10 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   const [lightboxImage, setLightboxImage] = useState(null);
   const [showCallTargetPicker, setShowCallTargetPicker] = useState(false);
   const [callTargetUserId, setCallTargetUserId] = useState(null);
+  const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const [groupCallActive, setGroupCallActive] = useState(null);
+  const [groupCallParticipants, setGroupCallParticipants] = useState([]);
+  const groupCallHostRef = useRef(false);
 
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -139,10 +143,25 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
         setIncomingCallFrom({ userId: data.fromUserId, userName: data.fromUserName || 'شخص' });
         setCallState('incoming');
       };
-      const onWebRTCSignal = (data) => {
+      const onWebRTCSignal = async (data) => {
         if (data.conversationId !== conversation.id) return;
-        const { signal } = data;
-        if (signal.type === 'offer') pendingOfferRef.current = { type: 'offer', sdp: signal.sdp };
+        const { signal, fromUserId } = data;
+        if (signal.type === 'offer') {
+          const inGroupCall = groupCallHostRef.current && localStreamRef.current;
+          if (inGroupCall && fromUserId) {
+            try {
+              const pc = createPeerConnection(fromUserId);
+              peerConnectionRef.current = pc;
+              localStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, localStreamRef.current));
+              await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: signal.sdp }));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: fromUserId, signal: { type: 'answer', sdp: answer.sdp } });
+            } catch (_) {}
+          } else {
+            pendingOfferRef.current = { type: 'offer', sdp: signal.sdp };
+          }
+        }
         if (signal.type === 'answer' && peerConnectionRef.current) {
           peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: signal.sdp })).then(() => setCallState('connected')).catch(() => {});
         }
@@ -189,6 +208,28 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
       socket.on('webrtc_signal', onWebRTCSignal);
       socket.on('call_rejected', onCallRejected);
       socket.on('call_ended', onCallEnded);
+      const onGroupCallStarted = (data) => {
+        if (data.conversationId !== conversation.id) return;
+        setGroupCallActive({ initiatorId: data.initiatorId, initiatorName: data.initiatorName });
+        setGroupCallParticipants(data.participants || []);
+      };
+      const onGroupCallUserJoined = (data) => {
+        if (data.conversationId !== conversation.id) return;
+        setGroupCallParticipants(data.participants || []);
+      };
+      const onGroupCallUserLeft = (data) => {
+        if (data.conversationId !== conversation.id) return;
+        setGroupCallParticipants(data.participants || []);
+        if (data.participants.length === 0) setGroupCallActive(null);
+      };
+      const onGroupCallYouJoined = (data) => {
+        if (data.conversationId !== conversation.id) return;
+        setGroupCallParticipants(data.participants || []);
+      };
+      socket.on('group_call_started', onGroupCallStarted);
+      socket.on('group_call_user_joined', onGroupCallUserJoined);
+      socket.on('group_call_user_left', onGroupCallUserLeft);
+      socket.on('group_call_you_joined', onGroupCallYouJoined);
       return () => {
         socket.off('new_message', onNew);
         socket.off('user_typing', onTyping);
@@ -199,6 +240,10 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
         socket.off('webrtc_signal', onWebRTCSignal);
         socket.off('call_rejected', onCallRejected);
         socket.off('call_ended', onCallEnded);
+        socket.off('group_call_started', onGroupCallStarted);
+        socket.off('group_call_user_joined', onGroupCallUserJoined);
+        socket.off('group_call_user_left', onGroupCallUserLeft);
+        socket.off('group_call_you_joined', onGroupCallYouJoined);
         socket.emit('leave_conversation', conversation.id);
       };
     }
@@ -256,7 +301,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   };
 
   useEffect(() => {
-    if ((callState === 'calling' || callState === 'connected') && hasLocalStream && localStreamRef.current && localVideoRef.current) {
+    if ((callState === 'calling' || callState === 'connected' || callState === 'group_call') && hasLocalStream && localStreamRef.current && localVideoRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
   }, [callState, hasLocalStream]);
@@ -555,6 +600,56 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
     setIncomingCallFrom(null);
   };
 
+  const startGroupCall = async () => {
+    if (!socket || !conversation?.id || conversation?.type !== 'group') return;
+    setShowCallTargetPicker(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      localStreamRef.current = stream;
+      setHasLocalStream(true);
+      setCallWithVideo(true);
+      setCallState('group_call');
+      groupCallHostRef.current = true;
+      socket.emit('start_group_call', { conversationId: conversation.id });
+    } catch (err) {
+      setCallState('idle');
+    }
+  };
+
+  const joinGroupCall = async () => {
+    if (!socket || !conversation?.id || !groupCallActive) return;
+    const target = groupCallActive.initiatorId || groupCallParticipants.find((id) => id !== currentUserId);
+    if (!target || target === currentUserId) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      localStreamRef.current = stream;
+      setHasLocalStream(true);
+      setCallWithVideo(true);
+      setCallState('group_call');
+      setGroupCallParticipants((p) => (p.includes(currentUserId) ? p : [...p, currentUserId]));
+      socket.emit('join_group_call', { conversationId: conversation.id });
+      if (target) {
+        setCallTargetUserId(target);
+        const pc = createPeerConnection(target);
+        peerConnectionRef.current = pc;
+        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: target, signal: { type: 'offer', sdp: offer.sdp } });
+      }
+    } catch (err) {
+      setCallState('idle');
+    }
+  };
+
+  const leaveGroupCall = () => {
+    groupCallHostRef.current = false;
+    if (socket && conversation?.id) socket.emit('leave_group_call', { conversationId: conversation.id });
+    hangupCall();
+    setGroupCallActive(null);
+    setGroupCallParticipants([]);
+  };
+
   const hangupCall = () => {
     setCallTargetUserId(null);
     if (socket && conversation?.id) socket.emit('hangup_call', { conversationId: conversation.id });
@@ -596,6 +691,9 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
       <div className="chat-header-bar" style={s.header}>
         <button type="button" style={s.backBtn} onClick={onBack}>← رجوع</button>
         <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{conversation.label || conversation.name || 'محادثة'}</span>
+        {conversation?.type === 'group' && (
+          <button type="button" style={s.voiceBtn} onClick={() => setShowGroupMenu(true)} title="خيارات المجموعة">⋮</button>
+        )}
         {(isDirectTwo || isGroupCallable) && callState === 'idle' && (
           <>
             {isDirectTwo && isAdmin && onBlockUser && otherUserId && (
@@ -609,14 +707,43 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
             )}
             {isGroupCallable && (
               <>
-                <button type="button" style={s.voiceBtn} onClick={() => setShowCallTargetPicker(true)} title="اتصال صوتي">📞</button>
-                <button type="button" style={s.voiceBtn} onClick={() => setShowCallTargetPicker(true)} title="اتصال فيديو">📹</button>
+                <button type="button" style={s.voiceBtn} onClick={() => setShowCallTargetPicker(true)} title="مكالمة مع عضو">📞</button>
+                <button type="button" style={s.voiceBtn} onClick={() => setShowCallTargetPicker(true)} title="مكالمة فيديو مع عضو">📹</button>
+                <button type="button" style={{ ...s.voiceBtn, background: 'var(--primary)' }} onClick={startGroupCall} title="بدء مكالمة مجموعة">📹 مجموعة</button>
               </>
             )}
           </>
         )}
         {callState === 'calling' && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>جاري الاتصال...</span>}
       </div>
+      {showGroupMenu && conversation?.type === 'group' && (
+        <div style={s.callModal} onClick={() => setShowGroupMenu(false)}>
+          <div style={{ ...s.callModalBox, textAlign: 'right', minWidth: 280 }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 16px' }}>خيارات المجموعة</h3>
+            {Number(conversation?.created_by) === Number(currentUserId) && (
+              <>
+                <button type="button" style={{ display: 'block', width: '100%', padding: '12px 16px', marginBottom: 8, background: 'rgba(248,81,73,0.15)', border: '1px solid #f85149', borderRadius: 8, color: '#f85149', cursor: 'pointer', fontSize: 14, textAlign: 'right' }} onClick={() => { onDeleteGroup?.(conversation.id); setShowGroupMenu(false); }}>حذف المجموعة</button>
+                <p style={{ fontSize: 12, color: '#4a5568', marginBottom: 8 }}>طرد عضو:</p>
+                {groupMembers.map((m) => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span>{m.name} (معرف: {m.id})</span>
+                    <button type="button" style={{ padding: '6px 12px', background: 'rgba(248,81,73,0.2)', border: 'none', borderRadius: 6, color: '#f85149', cursor: 'pointer', fontSize: 12 }} onClick={() => { onRemoveMember?.(conversation.id, m.id); setShowGroupMenu(false); }}>طرد</button>
+                  </div>
+                ))}
+                <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }} />
+              </>
+            )}
+            <button type="button" style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }} onClick={() => { onLeaveGroup?.(conversation.id); setShowGroupMenu(false); }}>مغادرة المجموعة</button>
+            <button type="button" onClick={() => setShowGroupMenu(false)} style={{ marginTop: 12, ...s.backBtn }}>إغلاق</button>
+          </div>
+        </div>
+      )}
+      {groupCallActive && !groupCallParticipants.includes(currentUserId) && callState === 'idle' && (
+        <div style={{ padding: 12, background: 'rgba(35,134,54,0.2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontSize: 14 }}>مكالمة مجموعة جارية من {groupCallActive.initiatorName} — انضم براحتك</span>
+          <button type="button" style={s.sendBtn} onClick={joinGroupCall}>انضم للمكالمة</button>
+        </div>
+      )}
       {showCallTargetPicker && isGroupCallable && (
         <div style={s.callModal} onClick={() => setShowCallTargetPicker(false)}>
           <div style={s.callModalBox} onClick={(e) => e.stopPropagation()}>
@@ -645,17 +772,17 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
           </div>
         </div>
       )}
-      {(callState === 'calling' || callState === 'connected') && (
+      {(callState === 'calling' || callState === 'connected' || callState === 'group_call') && (
         <div style={s.callVideoWrap}>
           <video ref={remoteVideoRef} style={s.remoteVideo} autoPlay playsInline muted={false} />
           <video ref={localVideoRef} style={s.localVideo} autoPlay playsInline muted />
           <span style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', color: '#fff', fontSize: 14 }}>
             {callState === 'connected' ? (callWithVideo ? 'مكالمة فيديو' : 'مكالمة صوتية') : 'جاري الاتصال...'}
           </span>
-          <button type="button" style={s.hangupBtn} onClick={hangupCall}>إنهاء المكالمة</button>
+          <button type="button" style={s.hangupBtn} onClick={callState === 'group_call' || groupCallParticipants.length > 0 ? leaveGroupCall : hangupCall}>إنهاء المكالمة</button>
         </div>
       )}
-      {(callState === 'calling' || callState === 'connected') && <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />}
+      {(callState === 'calling' || callState === 'connected' || callState === 'group_call') && <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />}
       {lightboxImage && (
         <div
           onClick={() => setLightboxImage(null)}

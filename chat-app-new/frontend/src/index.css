@@ -13,6 +13,7 @@
   --msg-bg-own: #238636;
   --msg-bg-other: #1c2128;
   --menu-bg: #161b22;
+  --msg-action-color: #4a5568;
 }
 [data-theme="light"] {
   --bg: #f0f2f5;
@@ -28,6 +29,7 @@
   --msg-bg-own: #0084ff;
   --msg-bg-other: #e4e6eb;
   --menu-bg: #ffffff;
+  --msg-action-color: #374151;
 }
 [data-font-size="small"] { font-size: 14px; }
 [data-font-size="large"] { font-size: 18px; }

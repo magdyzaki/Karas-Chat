@@ -334,5 +334,49 @@ export const db = {
   getBlockedUsers() {
     low.read();
     return low.data.blocked_user_ids.map((id) => db.findUserById(id)).filter(Boolean);
+  },
+
+  leaveConversation(conversationId, userId) {
+    low.read();
+    const cid = Number(conversationId);
+    const uid = Number(userId);
+    const conv = low.data.conversations.find((c) => c.id === cid);
+    if (!conv) return false;
+    if (conv.type === 'direct') return false;
+    const idx = low.data.conversation_members.findIndex((m) => m.conversation_id === cid && m.user_id === uid);
+    if (idx < 0) return false;
+    low.data.conversation_members.splice(idx, 1);
+    low.write();
+    return true;
+  },
+
+  deleteConversation(conversationId, userId) {
+    low.read();
+    const cid = Number(conversationId);
+    const uid = Number(userId);
+    const conv = low.data.conversations.find((c) => c.id === cid);
+    if (!conv) return false;
+    if (Number(conv.created_by) !== uid) return false;
+    low.data.conversations = low.data.conversations.filter((c) => c.id !== cid);
+    low.data.conversation_members = low.data.conversation_members.filter((m) => m.conversation_id !== cid);
+    low.data.messages = low.data.messages.filter((m) => m.conversation_id !== cid);
+    low.data.conversation_reads = (low.data.conversation_reads || []).filter((r) => r.conversation_id !== cid);
+    low.write();
+    return true;
+  },
+
+  removeMemberFromGroup(conversationId, actorUserId, targetUserId) {
+    low.read();
+    const cid = Number(conversationId);
+    const conv = low.data.conversations.find((c) => c.id === cid);
+    if (!conv || conv.type !== 'group') return false;
+    if (Number(conv.created_by) !== Number(actorUserId)) return false;
+    const targetId = Number(targetUserId);
+    if (targetId === Number(actorUserId)) return false;
+    const idx = low.data.conversation_members.findIndex((m) => m.conversation_id === cid && m.user_id === targetId);
+    if (idx < 0) return false;
+    low.data.conversation_members.splice(idx, 1);
+    low.write();
+    return true;
   }
 };
