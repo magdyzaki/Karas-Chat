@@ -17,6 +17,8 @@ export default function Auth({ onLogin }) {
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [pendingVerification, setPendingVerification] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,6 +32,11 @@ export default function Auth({ onLogin }) {
     setLoading(true);
     try {
       const data = isLogin ? await api.login(emailOrPhone.trim(), password) : await api.register(emailOrPhone.trim(), password, name);
+      if (data.needsVerification) {
+        setPendingVerification(data.emailOrPhone);
+        setVerificationCode('');
+        return;
+      }
       onLogin(data);
     } catch (err) {
       setError(err.message || 'حدث خطأ');
@@ -37,6 +44,55 @@ export default function Auth({ onLogin }) {
       setLoading(false);
     }
   };
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!verificationCode.trim()) {
+      setError('أدخل رمز التحقق');
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await api.verify(pendingVerification, verificationCode.trim());
+      onLogin(data);
+    } catch (err) {
+      setError(err.message || 'رمز غير صحيح');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (pendingVerification) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.box}>
+          <h1 style={styles.title}>تأكيد الحساب</h1>
+          <p style={styles.hint}>أدخل رمز التحقق المرسل إلى {pendingVerification}</p>
+          {error && <p style={styles.err}>{error}</p>}
+          <form onSubmit={handleVerify}>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="رمز التحقق (6 أرقام)"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              style={styles.input}
+              maxLength={6}
+            />
+            <button type="submit" style={styles.btn} disabled={loading}>
+              {loading ? 'جاري...' : 'تأكيد'}
+            </button>
+          </form>
+          <p style={styles.toggle}>
+            <button type="button" onClick={() => { setPendingVerification(null); setError(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 14 }}>
+              رجوع
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>

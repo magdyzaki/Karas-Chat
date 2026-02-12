@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 import * as api from './api';
 import Auth from './Auth';
 import ChatList from './ChatList';
 import ChatRoom from './ChatRoom';
 import InvitePage from './InvitePage';
+import Settings from './Settings';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || '';
 const ADMIN_IDS = (import.meta.env.VITE_ADMIN_USER_IDS || '1').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
@@ -27,8 +28,19 @@ function App() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
 
   const token = localStorage.getItem('chat_token');
+
+  useEffect(() => {
+    const closeMenu = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener('click', closeMenu);
+    return () => document.removeEventListener('click', closeMenu);
+  }, []);
   const savedUser = localStorage.getItem('chat_user');
 
   const handleInviteValid = () => {
@@ -62,6 +74,19 @@ function App() {
   };
 
   useEffect(() => {
+    const theme = localStorage.getItem('chat_theme') || 'dark';
+    const wp = localStorage.getItem('chat_wallpaper') || 'default';
+    const bg = localStorage.getItem('chat_bg') || 'none';
+    const fs = localStorage.getItem('chat_font_size') || 'medium';
+    document.documentElement.dataset.theme = theme;
+    document.body.dataset.chatBg = bg;
+    document.documentElement.dataset.fontSize = fs;
+    const wpBg = wp === 'default' ? 'var(--bg)' : wp === 'dark' ? '#0d1117' : wp === 'blue' ? 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)' : wp === 'green' ? 'linear-gradient(135deg, #0d2818 0%, #1a3d2e 100%)' : wp === 'purple' ? 'linear-gradient(135deg, #1a0d2e 0%, #2d1b4e 100%)' : wp === 'light' ? '#f0f2f5' : 'var(--bg)';
+    document.documentElement.style.setProperty('--chat-wallpaper', wpBg);
+    document.body.style.background = wpBg;
+  }, []);
+
+  useEffect(() => {
     if (savedUser && token) {
       try {
         setUser(JSON.parse(savedUser));
@@ -71,6 +96,13 @@ function App() {
       }
     }
   }, [token, savedUser]);
+
+  const handleUserUpdate = (updates) => {
+    if (!user) return;
+    const updated = { ...user, ...updates };
+    setUser(updated);
+    localStorage.setItem('chat_user', JSON.stringify(updated));
+  };
 
   const loadConversations = useCallback(async () => {
     if (!token) return;
@@ -183,18 +215,72 @@ function App() {
     <div className="app-container" style={{ display: 'flex', height: '100dvh', flexDirection: 'column', maxWidth: 900, margin: '0 auto', width: '100%' }}>
       <header className="app-header" style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <h1 style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 18px)' }}>Karas شات</h1>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {user?.avatar_url ? <img src={api.uploadsUrl(user.avatar_url)} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : null}
           {user.name || user.email || user.phone || 'أنت'}
-          {user?.id && !isAdmin(user?.id) && <span style={{ fontSize: 10, opacity: 0.8, marginRight: 4 }} title="أضف هذا الرقم في VITE_ADMIN_USER_IDS و ADMIN_USER_IDS لتصبح مسؤولاً"> (معرف: {user.id})</span>}
+          <span style={{ fontSize: 10, opacity: 0.8 }}>(معرف: {user.id})</span>
         </span>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {isAdmin(user?.id) && (
-            <>
-              <button type="button" onClick={() => { setShowBlockedModal(true); loadBlockedUsers(); }} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 12 }}>الموقوفون</button>
-              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ padding: '6px 10px', background: inviteLoading ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 12 }}>{inviteLoading ? '...' : 'رابط دعوة'}</button>
-            </>
+        <div ref={menuRef} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            style={{ padding: '8px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}
+            title="القائمة والإعدادات"
+          >
+            <span>⚙</span>
+            <span>القائمة</span>
+          </button>
+          {menuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: 4,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                minWidth: 180,
+                zIndex: 25
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => { setShowSettings(true); setMenuOpen(false); }}
+                style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}
+              >
+                الإعدادات
+              </button>
+              {isAdmin(user?.id) && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setShowBlockedModal(true); loadBlockedUsers(); setMenuOpen(false); }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}
+                  >
+                    الموقوفون
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleCreateInviteLink(); setMenuOpen(false); }}
+                    disabled={inviteLoading}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: inviteLoading ? 'var(--text-muted)' : 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 14, textAlign: 'right' }}
+                  >
+                    {inviteLoading ? 'جاري...' : 'رابط دعوة'}
+                  </button>
+                </>
+              )}
+              <div style={{ borderTop: '1px solid var(--border)' }} />
+              <button
+                type="button"
+                onClick={() => { handleLogout(); setMenuOpen(false); }}
+                style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: '#f85149', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}
+              >
+                خروج
+              </button>
+            </div>
           )}
-          <button type="button" onClick={handleLogout} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>خروج</button>
         </div>
       </header>
       {error && <p style={{ padding: 6, margin: 0, background: 'rgba(248,81,73,0.15)', color: '#f85149', textAlign: 'center', fontSize: 13 }}>{error}</p>}
@@ -246,6 +332,13 @@ function App() {
             )}
           </div>
         </div>
+      )}
+      {showSettings && (
+        <Settings
+          user={user}
+          onClose={() => setShowSettings(false)}
+          onUpdate={handleUserUpdate}
+        />
       )}
       {showBlockedModal && isAdmin(user?.id) && (
         <div onClick={() => setShowBlockedModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>

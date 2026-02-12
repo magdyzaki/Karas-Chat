@@ -8,8 +8,8 @@ const s = {
   backBtn: { padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' },
   messages: { flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 },
   msg: { maxWidth: '80%', padding: '10px 14px', borderRadius: 12, alignSelf: 'flex-start', wordBreak: 'break-word' },
-  msgOwn: { alignSelf: 'flex-end', background: 'var(--primary)', color: '#fff' },
-  msgOther: { background: 'var(--surface)', border: '1px solid var(--border)' },
+  msgOwn: { alignSelf: 'flex-end', background: 'var(--msg-bg-own, var(--primary))', color: '#fff' },
+  msgOther: { background: 'var(--msg-bg-other, var(--surface))', border: '1px solid var(--border)' },
   msgMeta: { fontSize: 11, opacity: 0.8, marginTop: 4 },
   replyBar: { fontSize: 12, opacity: 0.9, padding: '6px 10px', borderRight: '3px solid var(--primary)', marginBottom: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 4 },
   form: { padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' },
@@ -74,6 +74,8 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   const [callWithVideo, setCallWithVideo] = useState(true);
   const [hasLocalStream, setHasLocalStream] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [showCallTargetPicker, setShowCallTargetPicker] = useState(false);
+  const [callTargetUserId, setCallTargetUserId] = useState(null);
 
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -165,6 +167,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
         if (data.conversationId !== conversation.id) return;
         setCallState('idle');
         setIncomingCallFrom(null);
+        setCallTargetUserId(null);
         if (peerConnectionRef.current) {
           peerConnectionRef.current.close();
           peerConnectionRef.current = null;
@@ -446,13 +449,24 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
 
   const otherUserId = useMemo(() => {
     const ids = conversation?.memberIds || [];
-    if (ids.length !== 2) return null;
-    return ids.find((id) => Number(id) !== Number(currentUserId)) ?? null;
-  }, [conversation?.memberIds, currentUserId]);
+    if (ids.length !== 2) return callTargetUserId ?? ids.find((id) => Number(id) !== Number(currentUserId)) ?? null;
+    return callTargetUserId ?? ids.find((id) => Number(id) !== Number(currentUserId)) ?? null;
+  }, [conversation?.memberIds, currentUserId, callTargetUserId]);
 
   const isDirectTwo = conversation?.type === 'direct' && otherUserId != null;
+  const isGroupCallable = conversation?.type === 'group' && (conversation?.memberIds || []).length >= 2;
 
-  const createPeerConnection = () => {
+  const groupMembers = useMemo(() => {
+    if (conversation?.type !== 'group') return [];
+    const ids = conversation?.memberIds || [];
+    const details = conversation?.memberDetails || [];
+    return ids.filter((id) => Number(id) !== Number(currentUserId)).map((id) => {
+      const d = details.find((m) => Number(m.id) === Number(id));
+      return { id, name: d?.name || d?.email || d?.phone || 'عضو', avatar_url: d?.avatar_url };
+    });
+  }, [conversation, currentUserId]);
+
+  const createPeerConnection = (targetUserId = null) => {
     const iceServers = [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
@@ -478,28 +492,32 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
     };
     pc.onicecandidate = (e) => {
-      if (e.candidate && socket && conversation?.id && otherUserId != null) {
-        socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: otherUserId, signal: { type: 'ice', candidate: e.candidate } });
+      const t = targetUserId ?? otherUserId;
+      if (e.candidate && socket && conversation?.id && t != null) {
+        socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: t, signal: { type: 'ice', candidate: e.candidate } });
       }
     };
     return pc;
   };
 
-  const startCall = async (withVideo = true) => {
-    if (!socket || !conversation?.id || !otherUserId) return;
+  const startCall = async (withVideo = true, targetId = null) => {
+    const target = targetId ?? otherUserId;
+    if (!socket || !conversation?.id || !target) return;
+    setCallTargetUserId(targetId ?? target);
+    setShowCallTargetPicker(false);
     setCallWithVideo(withVideo);
     setCallState('calling');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo ? { facingMode: 'user' } : false });
       localStreamRef.current = stream;
       setHasLocalStream(true);
-      const pc = createPeerConnection();
+      const pc = createPeerConnection(target);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       peerConnectionRef.current = pc;
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socket.emit('start_call', { conversationId: conversation.id });
-      socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: otherUserId, signal: { type: 'offer', sdp: offer.sdp } });
+      socket.emit('start_call', { conversationId: conversation.id, toUserId: conversation?.type === 'group' ? target : undefined });
+      socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: target, signal: { type: 'offer', sdp: offer.sdp } });
     } catch (err) {
       setCallState('idle');
     }
@@ -507,7 +525,8 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
 
   const acceptCall = async (withVideo = true) => {
     const offer = pendingOfferRef.current;
-    if (!socket || !conversation?.id || !otherUserId || !offer) return;
+    const target = incomingCallFrom?.userId ?? otherUserId;
+    if (!socket || !conversation?.id || !target || !offer) return;
     setCallWithVideo(withVideo);
     setIncomingCallFrom(null);
     setCallState('connected');
@@ -515,14 +534,14 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo ? { facingMode: 'user' } : false });
       localStreamRef.current = stream;
       setHasLocalStream(true);
-      const pc = createPeerConnection();
+      const pc = createPeerConnection(target);
       peerConnectionRef.current = pc;
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offer.sdp }));
       pendingOfferRef.current = null;
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: otherUserId, signal: { type: 'answer', sdp: answer.sdp } });
+      socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: target, signal: { type: 'answer', sdp: answer.sdp } });
     } catch (err) {
       setCallState('idle');
     }
@@ -537,6 +556,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   };
 
   const hangupCall = () => {
+    setCallTargetUserId(null);
     if (socket && conversation?.id) socket.emit('hangup_call', { conversationId: conversation.id });
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
@@ -573,20 +593,46 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
 
   return (
     <div className="chat-room-inner" style={s.room}>
-      <div style={s.header}>
+      <div className="chat-header-bar" style={s.header}>
         <button type="button" style={s.backBtn} onClick={onBack}>← رجوع</button>
         <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{conversation.label || conversation.name || 'محادثة'}</span>
-        {isDirectTwo && callState === 'idle' && (
+        {(isDirectTwo || isGroupCallable) && callState === 'idle' && (
           <>
-            {isAdmin && onBlockUser && otherUserId && (
+            {isDirectTwo && isAdmin && onBlockUser && otherUserId && (
               <button type="button" style={{ ...s.voiceBtn, background: 'rgba(248,81,73,0.2)', color: '#f85149' }} onClick={() => onBlockUser(otherUserId)} title="إيقاف وصوله">⏹</button>
             )}
-            <button type="button" style={s.voiceBtn} onClick={() => startCall(false)} title="مكالمة صوتية">📞</button>
-            <button type="button" style={s.voiceBtn} onClick={() => startCall(true)} title="مكالمة فيديو">📹</button>
+            {isDirectTwo && (
+              <>
+                <button type="button" style={s.voiceBtn} onClick={() => startCall(false)} title="مكالمة صوتية">📞</button>
+                <button type="button" style={s.voiceBtn} onClick={() => startCall(true)} title="مكالمة فيديو">📹</button>
+              </>
+            )}
+            {isGroupCallable && (
+              <>
+                <button type="button" style={s.voiceBtn} onClick={() => setShowCallTargetPicker(true)} title="اتصال صوتي">📞</button>
+                <button type="button" style={s.voiceBtn} onClick={() => setShowCallTargetPicker(true)} title="اتصال فيديو">📹</button>
+              </>
+            )}
           </>
         )}
         {callState === 'calling' && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>جاري الاتصال...</span>}
       </div>
+      {showCallTargetPicker && isGroupCallable && (
+        <div style={s.callModal} onClick={() => setShowCallTargetPicker(false)}>
+          <div style={s.callModalBox} onClick={(e) => e.stopPropagation()}>
+            <p style={{ margin: '0 0 16px' }}>اختر العضو للمكالمة</p>
+            {groupMembers.map((m) => (
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                {m.avatar_url ? <img src={api.uploadsUrl(m.avatar_url)} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</span>}
+                <span style={{ flex: 1 }}>{m.name} (معرف: {m.id})</span>
+                <button type="button" style={{ ...s.voiceBtn, fontSize: 12 }} onClick={() => startCall(false, m.id)}>📞 صوت</button>
+                <button type="button" style={s.voiceBtn} onClick={() => startCall(true, m.id)}>📹 فيديو</button>
+              </div>
+            ))}
+            <button type="button" onClick={() => setShowCallTargetPicker(false)} style={{ marginTop: 12, ...s.backBtn }}>إلغاء</button>
+          </div>
+        </div>
+      )}
       {callState === 'incoming' && incomingCallFrom && (
         <div style={s.callModal}>
           <div style={s.callModalBox}>
@@ -674,7 +720,13 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
           const isRead = isOwn && others.length > 0 && typeof m.id === 'number' && others.every((uid) => (readReceipts[uid] || 0) >= m.id);
           return (
             <div key={m.id} style={{ ...s.msg, ...(isOwn ? s.msgOwn : s.msgOther) }}>
-              {!isOwn && m.sender && <div style={{ fontSize: 12, opacity: 0.9 }}>{m.sender.name || m.sender.email || m.sender.phone}</div>}
+              {!isOwn && m.sender && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  {m.sender.avatar_url ? <img src={api.uploadsUrl(m.sender.avatar_url)} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : null}
+                  <span style={{ fontSize: 12, opacity: 0.9 }}>{m.sender.name || m.sender.email || m.sender.phone}</span>
+                  <span style={{ fontSize: 10, opacity: 0.7 }}>(معرف: {m.sender.id})</span>
+                </div>
+              )}
               {(m.reply_to_id || m.reply_to_snippet) && !isDeleted && (
                 <div style={s.replyBar}>رد على: {replySnippet}</div>
               )}

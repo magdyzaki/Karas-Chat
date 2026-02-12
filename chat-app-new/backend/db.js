@@ -69,7 +69,7 @@ export const db = {
     low.read();
     return low.data.users.find((u) => u.id === Number(id));
   },
-  addUser({ email, password_hash, name, phone }) {
+  addUser({ email, password_hash, name, phone, verification_code, verification_expires }) {
     low.read();
     const id = nextId('users');
     const row = {
@@ -78,6 +78,10 @@ export const db = {
       phone: phone ? normalizePhone(phone) || null : null,
       password_hash,
       name: (name || '').trim(),
+      avatar_url: null,
+      verified: false,
+      verification_code: verification_code || null,
+      verification_expires: verification_expires || null,
       created_at: now()
     };
     low.data.users.push(row);
@@ -88,7 +92,7 @@ export const db = {
     low.read();
     return low.data.users
       .filter((u) => u.id !== Number(userId))
-      .map(({ id, email, phone, name }) => ({ id, email, phone, name }));
+      .map((u) => ({ id: u.id, email: u.email, phone: u.phone, name: u.name, avatar_url: u.avatar_url || null }));
   },
 
   findUsersByPhones(phoneNumbers, excludeUserId = null) {
@@ -102,7 +106,17 @@ export const db = {
     const exclude = excludeUserId != null ? Number(excludeUserId) : null;
     return low.data.users
       .filter((u) => u.phone && normalizedSet.has(normalizePhone(u.phone)) && (!exclude || u.id !== exclude))
-      .map(({ id, email, phone, name }) => ({ id, email, phone, name }));
+      .map((u) => ({ id: u.id, email: u.email, phone: u.phone, name: u.name, avatar_url: u.avatar_url || null }));
+  },
+
+  updateUserProfile(userId, { name, avatar_url }) {
+    low.read();
+    const u = low.data.users.find((x) => x.id === Number(userId));
+    if (!u) return null;
+    if (name !== undefined) u.name = (name || '').trim();
+    if (avatar_url !== undefined) u.avatar_url = avatar_url || null;
+    low.write();
+    return u;
   },
 
   getOrCreateDirectConversation(userId1, userId2) {
@@ -295,6 +309,17 @@ export const db = {
     low.write();
     return true;
   },
+  setUserVerified(userId, verified) {
+    low.read();
+    const u = low.data.users.find((x) => x.id === Number(userId));
+    if (!u) return false;
+    u.verified = !!verified;
+    u.verification_code = null;
+    u.verification_expires = null;
+    low.write();
+    return true;
+  },
+
   unblockUser(userId) {
     low.read();
     const id = Number(userId);

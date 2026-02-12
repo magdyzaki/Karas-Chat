@@ -39,6 +39,14 @@ app.post('/api/upload', jwtVerify, upload.single('file'), (req, res) => {
   res.json({ url, filename: req.file.originalname });
 });
 
+app.post('/api/upload-avatar', jwtVerify, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'لم يُرفع ملف' });
+  const url = '/uploads/' + req.file.filename;
+  const user = db.updateUserProfile(req.userId, { avatar_url: url });
+  if (!user) return res.status(500).json({ error: 'فشل تحديث البروفايل' });
+  res.json({ avatar_url: url });
+});
+
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => console.log('Chat backend on', PORT));
 
@@ -127,16 +135,24 @@ io.on('connection', (socket) => {
   });
 
   socket.on('start_call', (data) => {
-    const { conversationId } = data || {};
+    const { conversationId, toUserId } = data || {};
     if (!conversationId) return;
     const conv = db.getConversationByIdAndUser(conversationId, uid);
-    if (!conv || conv.type !== 'direct' || !conv.members || conv.members.length !== 2) return;
+    if (!conv || !conv.members || conv.members.length < 2) return;
+    const targetId = conv.type === 'direct'
+      ? conv.members.find((m) => Number(m) !== Number(uid))
+      : (toUserId != null ? Number(toUserId) : null);
+    if (targetId == null) return;
     const user = db.findUserById(uid);
-    socket.to('conv_' + conversationId).emit('incoming_call', {
+    const payload = {
       conversationId: Number(conversationId),
       fromUserId: uid,
       fromUserName: user ? user.name || user.email || user.phone : 'شخص'
-    });
+    };
+    const targetSockets = userSockets.get(Number(targetId));
+    if (targetSockets && targetSockets.size) {
+      targetSockets.forEach((sid) => io.to(sid).emit('incoming_call', payload));
+    }
   });
 
   socket.on('webrtc_signal', (data) => {

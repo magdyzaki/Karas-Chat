@@ -8,9 +8,13 @@ router.get('/', (req, res) => {
   const withDetails = list.map((c) => {
     const memberIds = c.members || db.getMemberIds(c.id);
     const others = memberIds.filter((id) => id !== req.userId);
-    const names = others.map((id) => db.findUserById(id)?.name || db.findUserById(id)?.email || db.findUserById(id)?.phone || '');
+    const memberDetails = others.map((id) => {
+      const u = db.findUserById(id);
+      return u ? { id: u.id, name: u.name, email: u.email, phone: u.phone, avatar_url: u.avatar_url || null } : { id, name: '', avatar_url: null };
+    });
+    const names = memberDetails.map((m) => m.name || m.email || m.phone || '');
     const label = c.type === 'group' ? c.name : names.join('، ');
-    return { ...c, label, memberIds };
+    return { ...c, label, memberIds, memberDetails };
   });
   res.json({ conversations: withDetails });
 });
@@ -18,7 +22,12 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   const conv = db.getConversationByIdAndUser(req.params.id, req.userId);
   if (!conv) return res.status(404).json({ error: 'المحادثة غير موجودة' });
-  res.json(conv);
+  const memberIds = conv.members || db.getMemberIds(conv.id);
+  const memberDetails = memberIds.map((id) => {
+    const u = db.findUserById(id);
+    return u ? { id: u.id, name: u.name, email: u.email, phone: u.phone, avatar_url: u.avatar_url || null } : { id, name: '', avatar_url: null };
+  });
+  res.json({ ...conv, memberDetails });
 });
 
 router.get('/:id/messages', (req, res) => {
@@ -27,10 +36,13 @@ router.get('/:id/messages', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
   const beforeId = req.query.before ? parseInt(req.query.before, 10) : null;
   const messages = db.getMessagesForConversation(conv.id, limit, beforeId, req.userId);
-  const withSenders = messages.map((m) => ({
-    ...m,
-    sender: db.findUserById(m.sender_id) ? { id: db.findUserById(m.sender_id).id, name: db.findUserById(m.sender_id).name, email: db.findUserById(m.sender_id).email, phone: db.findUserById(m.sender_id).phone } : null
-  }));
+  const withSenders = messages.map((m) => {
+    const u = db.findUserById(m.sender_id);
+    return {
+      ...m,
+      sender: u ? { id: u.id, name: u.name, email: u.email, phone: u.phone, avatar_url: u.avatar_url || null } : null
+    };
+  });
   const readReceipts = db.getConversationReads(conv.id);
   res.json({ messages: withSenders, readReceipts });
 });

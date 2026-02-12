@@ -1,17 +1,47 @@
 * { box-sizing: border-box; }
 :root {
   --bg: #0d1117;
-  --surface: #161b22;
-  --border: rgba(255,255,255,0.1);
+  --surface: #1c2128;
+  --surface-hover: #22272e;
+  --border: #373e47;
+  --border-light: rgba(255,255,255,0.12);
   --text: #e6edf3;
   --text-muted: #8b949e;
   --primary: #238636;
   --primary-hover: #2ea043;
+  --chat-wallpaper: var(--bg);
+  --msg-bg-own: #238636;
+  --msg-bg-other: #1c2128;
+  --menu-bg: #161b22;
 }
+[data-theme="light"] {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-hover: #e4e6eb;
+  --border: #ccd0d5;
+  --border-light: rgba(0,0,0,0.1);
+  --text: #050505;
+  --text-muted: #65676b;
+  --primary: #0084ff;
+  --primary-hover: #1877f2;
+  --chat-wallpaper: #e4e6eb;
+  --msg-bg-own: #0084ff;
+  --msg-bg-other: #e4e6eb;
+  --menu-bg: #ffffff;
+}
+[data-font-size="small"] { font-size: 14px; }
+[data-font-size="large"] { font-size: 18px; }
+body[data-chat-bg="dots"] .chat-msg-area { background-image: radial-gradient(circle, var(--border-light) 1px, transparent 1px); background-size: 18px 18px; }
+body[data-chat-bg="lines"] .chat-msg-area { background-image: repeating-linear-gradient(0deg, transparent, transparent 40px, var(--border-light) 40px, var(--border-light) 41px); }
+body[data-chat-bg="grid"] .chat-msg-area { background-image: linear-gradient(var(--border-light) 1px, transparent 1px), linear-gradient(90deg, var(--border-light) 1px, transparent 1px); background-size: 20px 20px; }
 html { overflow-x: hidden; }
-body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--chat-wallpaper, var(--bg)); color: var(--text); min-height: 100vh; overflow-x: hidden; }
 input, textarea, button { font-family: inherit; }
 a { color: var(--primary); }
+.app-header, .chat-list, .chat-room-inner .chat-header-bar { background: var(--menu-bg) !important; border-color: var(--border) !important; }
+.chat-list .chat-item, .chat-list .chat-item-active { border-color: var(--border) !important; }
+.chat-list .chat-item:hover { background: var(--surface-hover) !important; }
+.chat-list .chat-item-active { background: var(--surface) !important; }
 
 #root { width: 100%; max-width: 100%; min-height: 100vh; }
 @media (max-width: 600px) {

@@ -23,6 +23,17 @@ export async function register(emailOrPhone, password, name = '') {
   return data;
 }
 
+export async function verify(emailOrPhone, code) {
+  const res = await fetch(`${API_BASE}/api/auth/verify`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ emailOrPhone, code })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل التحقق');
+  return data;
+}
+
 export async function login(emailOrPhone, password) {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
@@ -170,4 +181,35 @@ export async function getBlockedUsers() {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب القائمة');
   return data.users || [];
+}
+
+export async function getProfile() {
+  const res = await fetch(`${API_BASE}/api/users/me`, { headers: headers() });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل جلب البروفايل');
+  return data;
+}
+
+export async function updateProfile({ name, avatar_url }) {
+  const res = await fetch(`${API_BASE}/api/users/me`, {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify({ name, avatar_url })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل تحديث البروفايل');
+  return data;
+}
+
+export async function uploadAvatar(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/api/upload-avatar`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: form
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل رفع الصورة');
+  return data;
 }

@@ -112,6 +112,7 @@ export default function ChatList(props) {
           {conversations.map((c) => (
             <div
               key={c.id}
+              className={currentConvId === c.id ? 'chat-item chat-item-active' : 'chat-item'}
               onClick={() => onSelect(c.id)}
               style={{ ...styles.item, ...(currentConvId === c.id ? styles.itemActive : {}) }}
             >
@@ -153,7 +154,13 @@ export default function ChatList(props) {
               <div>
                 {users.map((u) => (
                   <div key={u.id} style={styles.userRow}>
-                    <span>{u.name || u.email || u.phone || '—'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {u.avatar_url ? <img src={api.uploadsUrl(u.avatar_url)} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>👤</span>}
+                      <div>
+                        <div>{u.name || u.email || u.phone || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>معرف: {u.id}</div>
+                      </div>
+                    </div>
                     <button type="button" style={styles.newBtn} onClick={() => onStartDirect(u.id)}>محادثة</button>
                   </div>
                 ))}
@@ -169,7 +176,7 @@ export default function ChatList(props) {
                     <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>الأعضاء المختارون:</p>
                     {selectedForGroup.map((u) => (
                       <div key={u.id} style={{ ...styles.userRow, padding: '6px 0' }}>
-                        <span>{u.name || u.phone || '—'}</span>
+                        <span>{u.name || u.phone || '—'} <span style={{ fontSize: 10, opacity: 0.8 }}>(معرف: {u.id})</span></span>
                         <button type="button" style={{ ...styles.newBtn, fontSize: 12, background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)' }} onClick={() => removeFromGroup(u.id)}>إزالة</button>
                       </div>
                     ))}
@@ -177,7 +184,7 @@ export default function ChatList(props) {
                 )}
                 {users.map((u) => (
                   <div key={u.id} style={styles.userRow}>
-                    <span>{u.name || u.email || u.phone || '—'}</span>
+                    <span>{u.name || u.email || u.phone || '—'} <span style={{ fontSize: 10, opacity: 0.8 }}>(معرف: {u.id})</span></span>
                     <button type="button" style={styles.newBtn} onClick={() => addToGroup(u)} disabled={selectedForGroup.some((x) => x.id === u.id)}>
                       {selectedForGroup.some((x) => x.id === u.id) ? '✓ مضاف' : 'أضف'}
                     </button>
