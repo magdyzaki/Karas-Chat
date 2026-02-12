@@ -365,6 +365,22 @@ export const db = {
     return true;
   },
 
+  addMemberToGroup(conversationId, actorUserId, newMemberId) {
+    low.read();
+    const cid = Number(conversationId);
+    const conv = low.data.conversations.find((c) => c.id === cid);
+    if (!conv || conv.type !== 'group') return false;
+    if (Number(conv.created_by) !== Number(actorUserId)) return false;
+    const newId = Number(newMemberId);
+    const exists = low.data.conversation_members.some((m) => m.conversation_id === cid && m.user_id === newId);
+    if (exists) return false;
+    const user = db.findUserById(newId);
+    if (!user) return false;
+    low.data.conversation_members.push({ conversation_id: cid, user_id: newId, joined_at: now() });
+    low.write();
+    return true;
+  },
+
   removeMemberFromGroup(conversationId, actorUserId, targetUserId) {
     low.read();
     const cid = Number(conversationId);

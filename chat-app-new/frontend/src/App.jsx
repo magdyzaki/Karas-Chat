@@ -211,6 +211,10 @@ function App() {
     }
   };
 
+  const handleConversationUpdate = (updated) => {
+    setConversations((prev) => prev.map((c) => (c.id === updated.id ? { ...c, memberIds: updated.memberIds, memberDetails: updated.memberDetails } : c)));
+  };
+
   const handleRemoveMember = async (convId, targetUserId) => {
     if (!confirm('هل تريد طرد هذا العضو من المجموعة؟')) return;
     try {
@@ -343,6 +347,7 @@ function App() {
               onLeaveGroup={handleLeaveGroup}
               onDeleteGroup={handleDeleteGroup}
               onRemoveMember={handleRemoveMember}
+              onConversationUpdate={handleConversationUpdate}
             />
           ) : (
             <div className="chat-placeholder" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>اختر محادثة أو ابدأ محادثة جديدة</div>

@@ -133,6 +133,17 @@ export async function deleteGroup(conversationId) {
   return data;
 }
 
+export async function addMemberToGroup(conversationId, targetUserId) {
+  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/add-member`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ targetUserId })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إضافة العضو');
+  return data;
+}
+
 export async function removeMemberFromGroup(conversationId, targetUserId) {
   const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/remove-member`, {
     method: 'POST',

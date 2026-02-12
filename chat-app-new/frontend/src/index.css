@@ -10,7 +10,9 @@
   --primary: #238636;
   --primary-hover: #2ea043;
   --chat-wallpaper: var(--bg);
-  --msg-bg-own: #238636;
+  --msg-bg-own: #1a5f2a;
+  --msg-text-own: #ffffff;
+  --msg-meta-own: rgba(255,255,255,0.82);
   --msg-bg-other: #1c2128;
   --menu-bg: #161b22;
   --msg-action-color: #4a5568;
@@ -26,7 +28,9 @@
   --primary: #0084ff;
   --primary-hover: #1877f2;
   --chat-wallpaper: #e4e6eb;
-  --msg-bg-own: #0084ff;
+  --msg-bg-own: #0d6b2a;
+  --msg-text-own: #ffffff;
+  --msg-meta-own: rgba(255,255,255,0.78);
   --msg-bg-other: #e4e6eb;
   --menu-bg: #ffffff;
   --msg-action-color: #374151;

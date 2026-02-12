@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import EmojiPicker from 'emoji-picker-react';
 import * as api from './api';
+import GroupInfo from './GroupInfo';
 
 const s = {
   room: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid var(--border)' },
@@ -8,9 +9,11 @@ const s = {
   backBtn: { padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' },
   messages: { flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 },
   msg: { maxWidth: '80%', padding: '10px 14px', borderRadius: 12, alignSelf: 'flex-start', wordBreak: 'break-word' },
-  msgOwn: { alignSelf: 'flex-end', background: 'var(--msg-bg-own, var(--primary))', color: '#fff' },
+  msgOwn: { alignSelf: 'flex-end', background: 'var(--msg-bg-own)', color: 'var(--msg-text-own, #fff)' },
   msgOther: { background: 'var(--msg-bg-other, var(--surface))', border: '1px solid var(--border)' },
-  msgMeta: { fontSize: 11, color: 'var(--msg-action-color, #4a5568)', marginTop: 4 },
+  msgMeta: { fontSize: 11, marginTop: 4 },
+  msgMetaOwn: { color: 'var(--msg-meta-own, rgba(255,255,255,0.82))' },
+  msgMetaOther: { color: 'var(--msg-action-color, #4a5568)' },
   replyBar: { fontSize: 12, opacity: 0.9, padding: '6px 10px', borderRight: '3px solid var(--primary)', marginBottom: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 4 },
   form: { padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' },
   input: { flex: 1, minWidth: 120, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 15, minHeight: 44, textAlign: 'right' },
@@ -21,8 +24,12 @@ const s = {
   link: { color: 'var(--primary)', wordBreak: 'break-all' },
   typingBar: { padding: '4px 12px', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' },
   replyPreview: { padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 6, marginBottom: 6, fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  replyBtn: { background: 'none', border: 'none', color: 'var(--msg-action-color, #4a5568)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' },
-  deleteBtn: { background: 'none', border: 'none', color: 'var(--msg-action-color, #4a5568)', cursor: 'pointer', fontSize: 11, padding: '2px 6px' },
+  replyBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 6px' },
+  replyBtnOwn: { color: 'var(--msg-meta-own, rgba(255,255,255,0.82))' },
+  replyBtnOther: { color: 'var(--msg-action-color, #4a5568)' },
+  deleteBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '2px 6px' },
+  deleteBtnOwn: { color: 'var(--msg-meta-own, rgba(255,255,255,0.82))' },
+  deleteBtnOther: { color: 'var(--msg-action-color, #4a5568)' },
   voiceBtn: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontSize: 16 },
   audio: { maxWidth: '100%', minWidth: 200, marginTop: 4 },
   callModal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 },
@@ -36,10 +43,12 @@ const s = {
   searchRow: { padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center' },
   searchInput: { flex: 1, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 14 },
   loadMoreBtn: { padding: '8px 16px', margin: '8px auto', display: 'block', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 },
-  copyBtn: { background: 'none', border: 'none', color: 'var(--msg-action-color, #4a5568)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' }
+  copyBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 6px' },
+  copyBtnOwn: { color: 'var(--msg-meta-own, rgba(255,255,255,0.82))' },
+  copyBtnOther: { color: 'var(--msg-action-color, #4a5568)' }
 };
 
-export default function ChatRoom({ conversation, socket, currentUserId, onBack, isAdmin, onBlockUser, onLeaveGroup, onDeleteGroup, onRemoveMember }) {
+export default function ChatRoom({ conversation, socket, currentUserId, onBack, isAdmin, onBlockUser, onLeaveGroup, onDeleteGroup, onRemoveMember, onConversationUpdate }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -77,6 +86,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
   const [showCallTargetPicker, setShowCallTargetPicker] = useState(false);
   const [callTargetUserId, setCallTargetUserId] = useState(null);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [groupCallActive, setGroupCallActive] = useState(null);
   const [groupCallParticipants, setGroupCallParticipants] = useState([]);
   const groupCallHostRef = useRef(false);
@@ -690,7 +700,12 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
     <div className="chat-room-inner" style={s.room}>
       <div className="chat-header-bar" style={s.header}>
         <button type="button" style={s.backBtn} onClick={onBack}>← رجوع</button>
-        <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{conversation.label || conversation.name || 'محادثة'}</span>
+        <span
+          style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0, cursor: conversation?.type === 'group' ? 'pointer' : 'default' }}
+          onClick={conversation?.type === 'group' ? () => setShowGroupInfo(true) : undefined}
+        >
+          {conversation.label || conversation.name || 'محادثة'}
+        </span>
         {conversation?.type === 'group' && (
           <button type="button" style={s.voiceBtn} onClick={() => setShowGroupMenu(true)} title="خيارات المجموعة">⋮</button>
         )}
@@ -716,10 +731,20 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
         )}
         {callState === 'calling' && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>جاري الاتصال...</span>}
       </div>
+      {showGroupInfo && conversation?.type === 'group' && (
+        <GroupInfo
+          conversation={conversation}
+          currentUserId={currentUserId}
+          onClose={() => setShowGroupInfo(false)}
+          onMembersUpdated={(updated) => { if (updated) onConversationUpdate?.(updated); setShowGroupInfo(false); }}
+          onRemoveMember={onRemoveMember}
+        />
+      )}
       {showGroupMenu && conversation?.type === 'group' && (
         <div style={s.callModal} onClick={() => setShowGroupMenu(false)}>
           <div style={{ ...s.callModalBox, textAlign: 'right', minWidth: 280 }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 16px' }}>خيارات المجموعة</h3>
+            <button type="button" style={{ display: 'block', width: '100%', padding: '12px 16px', marginBottom: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }} onClick={() => { setShowGroupMenu(false); setShowGroupInfo(true); }}>معلومات المجموعة وإضافة عضو</button>
             {Number(conversation?.created_by) === Number(currentUserId) && (
               <>
                 <button type="button" style={{ display: 'block', width: '100%', padding: '12px 16px', marginBottom: 8, background: 'rgba(248,81,73,0.15)', border: '1px solid #f85149', borderRadius: 8, color: '#f85149', cursor: 'pointer', fontSize: 14, textAlign: 'right' }} onClick={() => { onDeleteGroup?.(conversation.id); setShowGroupMenu(false); }}>حذف المجموعة</button>
@@ -855,7 +880,7 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
                 </div>
               )}
               {(m.reply_to_id || m.reply_to_snippet) && !isDeleted && (
-                <div style={s.replyBar}>رد على: {replySnippet}</div>
+                <div style={{ ...s.replyBar, color: isOwn ? 'rgba(255,255,255,0.9)' : undefined }}>رد على: {replySnippet}</div>
               )}
               {isDeleted ? (
                 <div style={{ fontStyle: 'italic', opacity: 0.8 }}>تم حذف هذه الرسالة</div>
@@ -878,18 +903,18 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
                 </>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                <div style={s.msgMeta}>{new Date(m.created_at).toLocaleString('ar-EG')}</div>
+                <div style={{ ...s.msgMeta, ...(isOwn ? s.msgMetaOwn : s.msgMetaOther) }}>{new Date(m.created_at).toLocaleString('ar-EG')}</div>
                 {isRead && <span style={{ fontSize: 11, opacity: 0.9 }} title="تمت المشاهدة">✓✓</span>}
                 {canCopy && (
-                  <button type="button" style={s.copyBtn} onClick={() => copyMessageText(m)} title="نسخ">
+                  <button type="button" style={{ ...s.copyBtn, ...(isOwn ? s.copyBtnOwn : s.copyBtnOther) }} onClick={() => copyMessageText(m)} title="نسخ">
                     {copyDoneId === m.id ? 'تم النسخ' : 'نسخ'}
                   </button>
                 )}
-                {!isDeleted && <button type="button" style={s.replyBtn} onClick={() => setReplyTo({ id: m.id, snippet: getReplySnippet(m) || 'رسالة' })} title="رد">↩ رد</button>}
+                {!isDeleted && <button type="button" style={{ ...s.replyBtn, ...(isOwn ? s.replyBtnOwn : s.replyBtnOther) }} onClick={() => setReplyTo({ id: m.id, snippet: getReplySnippet(m) || 'رسالة' })} title="رد">↩ رد</button>}
                 {!isDeleted && isOwn && socket && (
                   <>
-                    <button type="button" style={s.deleteBtn} onClick={() => handleDelete(false)} title="حذف لي">حذف لي</button>
-                    <button type="button" style={s.deleteBtn} onClick={() => handleDelete(true)} title="حذف للجميع">حذف للجميع</button>
+                    <button type="button" style={{ ...s.deleteBtn, ...s.deleteBtnOwn }} onClick={() => handleDelete(false)} title="حذف لي">حذف لي</button>
+                    <button type="button" style={{ ...s.deleteBtn, ...s.deleteBtnOwn }} onClick={() => handleDelete(true)} title="حذف للجميع">حذف للجميع</button>
                   </>
                 )}
               </div>
