@@ -251,7 +251,7 @@ function App() {
           {showMenu && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowMenu(false)} />
-              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, transform: 'translateX(-12px)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 10, minWidth: 240 }}>
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 10, minWidth: 240 }}>
                 {currentConvId && (
                   <button type="button" onClick={() => { setCurrentConvId(null); setShowMenu(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>📋 المحادثات</button>
                 )}

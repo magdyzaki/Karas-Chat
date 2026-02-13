@@ -182,7 +182,7 @@ export default function ChatList(props) {
               </div>
               <button type="button" onClick={(e) => { e.stopPropagation(); setMenuConvId(menuConvId === c.id ? null : c.id); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4, fontSize: 16 }} title="المزيد">⋮</button>
               {menuConvId === c.id && (
-                <div style={{ position: 'absolute', left: 8, top: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 20, minWidth: 140, padding: 4 }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ position: 'absolute', left: 0, top: '100%', marginTop: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 20, minWidth: 160, padding: 4 }} onClick={(e) => e.stopPropagation()}>
                   {c.muted ? (
                     <button type="button" onClick={async () => { try { await api.unmuteConversation(c.id); onConversationsUpdate?.(); setMenuConvId(null); } catch (_) {} }} style={{ display: 'block', width: '100%', padding: '8px 12px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, textAlign: 'right' }}>إلغاء الكتم</button>
                   ) : (

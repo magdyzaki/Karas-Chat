@@ -137,6 +137,39 @@ export default function Settings({ onClose, user, onUserUpdate }) {
     }
   };
 
+  const handleEnableNotifications = async () => {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        alert('المتصفح لا يدعم التنبيهات. جرّب Chrome أو Edge.');
+        return;
+      }
+      const key = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!key || !key.trim()) {
+        alert('التنبيهات غير مفعّلة. أضف VITE_VAPID_PUBLIC_KEY في frontend/.env (انسخه من backend/.env)');
+        return;
+      }
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      await reg.update();
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        alert('تم رفض الإذن. فعّل الإشعارات من إعدادات المتصفح.');
+        return;
+      }
+      const base64 = key.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = '='.repeat((4 - base64.length % 4) % 4);
+      const raw = atob(base64 + pad);
+      const arr = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: arr });
+      await api.subscribePush(sub.toJSON());
+      alert('تم تفعيل التنبيهات بنجاح.');
+    } catch (e) {
+      console.error('Push subscribe:', e);
+      const msg = e?.message || 'فشل تفعيل التنبيهات';
+      alert(msg + (msg.includes('HTTPS') ? '' : '\nتأكد أنك تستخدم HTTPS أو localhost.'));
+    }
+  };
+
   const section = (title, children) => (
     <div style={{ marginBottom: 20 }}>
       <h3 style={{ fontSize: 14, color: 'var(--text-muted)', margin: '0 0 10px', borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>{title}</h3>
@@ -162,7 +195,7 @@ export default function Settings({ onClose, user, onUserUpdate }) {
         {section('التنبيهات (عند إغلاق التطبيق)', (
           <div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>تفعيل التنبيهات يعطيك صوت وتنبيه عند وصول رسالة حتى لو التطبيق مغلق.</p>
-            <button type="button" onClick={async () => { try { if (!('serviceWorker' in navigator) || !('PushManager' in window)) { alert('المتصفح لا يدعم التنبيهات'); return; } const reg = await navigator.serviceWorker.register('/sw.js'); const perm = await Notification.requestPermission(); if (perm !== 'granted') { alert('تم رفض الإذن'); return; } const key = import.meta.env.VITE_VAPID_PUBLIC_KEY; if (!key) { alert('التنبيهات غير مفعّلة. راجع الإعدادات'); return; } const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }); await api.subscribePush(sub.toJSON()); alert('تم تفعيل التنبيهات'); } catch (e) { alert(e.message || 'فشل تفعيل التنبيهات'); } }} style={{ padding: '10px 16px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 14 }}>🔔 تفعيل التنبيهات</button>
+            <button type="button" onClick={handleEnableNotifications} style={{ padding: '10px 16px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 14 }}>🔔 تفعيل التنبيهات</button>
           </div>
         ))}
 
