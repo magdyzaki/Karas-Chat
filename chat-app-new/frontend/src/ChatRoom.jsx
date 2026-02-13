@@ -437,7 +437,7 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
       : null;
     if (!targetId) return;
     setCallState({ isVoice, targetId });
-    socket?.emit('start_call', { conversationId: conversation.id, toUserId: targetId });
+    socket?.emit('start_call', { conversationId: conversation.id, toUserId: targetId, isVideo: !isVoice });
   };
 
   const handleRemoveMember = async (convId, memberId) => {

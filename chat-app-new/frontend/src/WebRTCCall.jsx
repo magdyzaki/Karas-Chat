@@ -23,9 +23,13 @@ export default function WebRTCCall({ socket, conversationId, remoteUserId, isIni
 
         stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
+        const remoteStream = new MediaStream();
         pc.ontrack = (e) => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = e.streams[0];
+          if (e.track && !remoteStream.getTracks().includes(e.track)) {
+            remoteStream.addTrack(e.track);
+          }
+          if (remoteVideoRef.current && remoteStream.getTracks().length > 0) {
+            remoteVideoRef.current.srcObject = remoteStream;
           }
         };
 

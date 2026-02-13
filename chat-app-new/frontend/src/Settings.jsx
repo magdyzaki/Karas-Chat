@@ -165,8 +165,7 @@ export default function Settings({ onClose, user, onUserUpdate }) {
       alert('تم تفعيل التنبيهات بنجاح.');
     } catch (e) {
       console.error('Push subscribe:', e);
-      const msg = e?.message || 'فشل تفعيل التنبيهات';
-      alert(msg + (msg.includes('HTTPS') ? '' : '\nتأكد أنك تستخدم HTTPS أو localhost.'));
+      alert(e?.message || 'فشل تفعيل التنبيهات');
     }
   };
 

@@ -206,7 +206,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('start_call', (data) => {
-    const { conversationId, toUserId } = data || {};
+    const { conversationId, toUserId, isVideo } = data || {};
     if (!conversationId) return;
     const conv = db.getConversationByIdAndUser(conversationId, uid);
     if (!conv || !conv.members || conv.members.length < 2) return;
@@ -218,7 +218,8 @@ io.on('connection', (socket) => {
     const payload = {
       conversationId: Number(conversationId),
       fromUserId: uid,
-      fromUserName: user ? user.name || user.email || user.phone : 'شخص'
+      fromUserName: user ? user.name || user.email || user.phone : 'شخص',
+      isVideo: !!isVideo
     };
     const targetSockets = userSockets.get(Number(targetId));
     if (targetSockets && targetSockets.size) {

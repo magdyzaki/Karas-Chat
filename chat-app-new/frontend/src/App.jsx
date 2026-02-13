@@ -279,14 +279,14 @@ function App() {
       {showPendingCodes && <PendingCodesModal onClose={() => setShowPendingCodes(false)} />}
       {incomingCall && !activeCall && (
         <CallModal
-          isVoice
+          isVoice={!incomingCall.isVideo}
           callerName={incomingCall.fromUserName}
           isOutgoing={false}
           onAnswer={() => {
             stopCallRing();
             socket?.emit('answer_call', { conversationId: incomingCall.conversationId, callerUserId: incomingCall.fromUserId });
             setCurrentConvId(incomingCall.conversationId);
-            setActiveCall({ conversationId: incomingCall.conversationId, remoteUserId: incomingCall.fromUserId, isInitiator: false, isVideo: false });
+            setActiveCall({ conversationId: incomingCall.conversationId, remoteUserId: incomingCall.fromUserId, isInitiator: false, isVideo: !!incomingCall.isVideo });
             setIncomingCall(null);
           }}
           onReject={() => { stopCallRing(); socket?.emit('reject_call', { conversationId: incomingCall.conversationId, callerUserId: incomingCall.fromUserId }); setIncomingCall(null); }}
