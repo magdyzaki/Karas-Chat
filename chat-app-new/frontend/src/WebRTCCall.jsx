@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 export default function WebRTCCall({ socket, conversationId, remoteUserId, isInitiator, isVideo, onEnd }) {
   const [status, setStatus] = useState(isInitiator ? 'connecting' : 'incoming');
   const [error, setError] = useState('');
+  const [remoteStream, setRemoteStream] = useState(null);
   const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
 
@@ -14,7 +14,7 @@ export default function WebRTCCall({ socket, conversationId, remoteUserId, isIni
 
     const setupPeer = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo ? { width: 640, height: 480 } : false });
         localStreamRef.current = stream;
         if (localVideoRef.current && isVideo) localVideoRef.current.srcObject = stream;
 
@@ -23,18 +23,22 @@ export default function WebRTCCall({ socket, conversationId, remoteUserId, isIni
 
         stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
-        const remoteStream = new MediaStream();
+        const remote = new MediaStream();
+        const flush = () => setRemoteStream(new MediaStream(remote.getTracks()));
         pc.ontrack = (e) => {
-          if (e.track && !remoteStream.getTracks().includes(e.track)) {
-            remoteStream.addTrack(e.track);
-          }
-          if (remoteVideoRef.current && remoteStream.getTracks().length > 0) {
-            remoteVideoRef.current.srcObject = remoteStream;
+          if (e.track && !remote.getTracks().includes(e.track)) {
+            remote.addTrack(e.track);
+            e.track.onunmute = flush;
+            flush();
           }
         };
 
         pc.onicecandidate = (e) => {
           if (e.candidate) socket.emit('webrtc_signal', { conversationId, toUserId: remoteUserId, signal: { candidate: e.candidate } });
+        };
+
+        pc.onconnectionstatechange = () => {
+          if (pc.connectionState === 'connected' && remote.getTracks().length > 0) flush();
         };
 
         if (isInitiator) {
@@ -97,7 +101,11 @@ export default function WebRTCCall({ socket, conversationId, remoteUserId, isIni
           </div>
         )}
         <div style={{ width: isVideo ? 240 : 80, background: '#222', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isVideo ? <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%' }} /> : <audio ref={remoteVideoRef} autoPlay style={{ width: '100%' }} />}
+          {isVideo ? (
+            <video srcObject={remoteStream || undefined} autoPlay playsInline style={{ width: '100%' }} onLoadedMetadata={(e) => e.target.play().catch(() => {})} />
+          ) : (
+            <audio srcObject={remoteStream || undefined} autoPlay style={{ width: '100%' }} />
+          )}
         </div>
       </div>
       <button type="button" onClick={onEnd} style={{ marginTop: 24, padding: '12px 24px', background: '#ef4444', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 16 }}>إنهاء المكالمة</button>
