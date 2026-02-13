@@ -27,6 +27,24 @@ const CAN_SEND_EMAIL = !!(process.env.SMTP_HOST || process.env.RESEND_API_KEY);
 const CAN_SEND_SMS = !!process.env.TWILIO_ACCOUNT_SID;
 const SKIP_VERIFICATION = process.env.SKIP_VERIFICATION === 'true';
 const APPROVAL_MODE = process.env.APPROVAL_MODE === 'true';
+const TRUSTED_PHONES = (process.env.TRUSTED_PHONES || '')
+  .split(',')
+  .map((s) => s.replace(/\D/g, '')).filter(Boolean);
+
+function normalizePhone(phone) {
+  const norm = String(phone || '').replace(/\D/g, '');
+  if (norm.startsWith('01') && norm.length === 11) return '2' + norm;
+  if (norm.startsWith('20') && norm.length >= 12) return norm.slice(0, 12);
+  return norm;
+}
+function isTrustedPhone(phone) {
+  if (!phone || TRUSTED_PHONES.length === 0) return false;
+  const norm = normalizePhone(phone);
+  return TRUSTED_PHONES.some((t) => {
+    const tn = normalizePhone(t);
+    return norm === tn || norm.endsWith(tn) || tn.endsWith(norm);
+  });
+}
 
 function genCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -66,7 +84,7 @@ router.post('/register', async (req, res) => {
     verification_code: code,
     verification_expires: expires
   });
-  if (SKIP_VERIFICATION) {
+  if (SKIP_VERIFICATION || (phone && isTrustedPhone(phone))) {
     db.setUserVerified(user.id, true);
     const verifiedUser = db.findUserById(user.id);
     const token = jwt.sign({ userId: verifiedUser.id }, JWT_SECRET, { expiresIn: '30d' });
@@ -227,7 +245,14 @@ router.post('/login', async (req, res) => {
   const user = db.findUserByEmailOrPhone(emailOrPhone);
   if (!user) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
   if (db.isUserBlocked(user.id)) return res.status(403).json({ error: 'تم إيقاف وصولك من قبل المسؤول' });
-  if (user.verified === false && !SKIP_VERIFICATION) return res.status(403).json({ error: 'يجب تأكيد الحساب أولاً. أدخل رمز التحقق المرسل إليك.' });
+  if (user.verified === false && !SKIP_VERIFICATION && !(user.phone && isTrustedPhone(user.phone))) {
+    return res.status(403).json({ error: 'يجب تأكيد الحساب أولاً. أدخل رمز التحقق المرسل إليك.' });
+  }
+  if (user.verified === false && user.phone && isTrustedPhone(user.phone)) {
+    db.setUserVerified(user.id, true);
+    const u = db.findUserById(user.id);
+    if (u) user.verified = u.verified;
+  }
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
