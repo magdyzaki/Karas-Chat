@@ -3,9 +3,12 @@ import { db } from '../db.js';
 import { jwtVerify } from '../middleware/auth.js';
 
 const router = Router();
+const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '1').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
+const isAdmin = (id) => id && ADMIN_IDS.includes(Number(id));
 
-// إنشاء رابط دعوة (للمستخدم المسجّل فقط)
+// إنشاء رابط دعوة (للأدمن فقط)
 router.post('/invite-links', jwtVerify, (req, res) => {
+  if (!isAdmin(req.userId)) return res.status(403).json({ error: 'غير مصرح - إنشاء الروابط مقتصر على الأدمن' });
   const row = db.createInviteLink(req.userId);
   res.json({ token: row.token });
 });

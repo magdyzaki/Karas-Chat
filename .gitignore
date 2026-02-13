@@ -32,6 +32,9 @@ database/ms_token_cache*.bin
 .env.*
 !.env.example
 
+# رموز التحقق في وضع التطوير (لا تُرفع)
+chat-app-new/backend/last_codes.json
+
 # رفع ملفات الشات (تُنشأ على السيرفر)
 chat-app/backend/uploads/*
 !chat-app/backend/uploads/.gitkeep

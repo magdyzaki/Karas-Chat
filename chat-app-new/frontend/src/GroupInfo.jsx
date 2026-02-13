@@ -6,7 +6,14 @@ function extractPhones(input) {
   return str.trim().split(/\s+/).filter(Boolean);
 }
 
-export default function GroupInfo({ conversation, currentUserId, onClose, onMembersUpdated, onRemoveMember }) {
+const DISAPPEARING_OPTS = [
+  { value: null, label: 'معطّل' },
+  { value: 86400, label: '24 ساعة' },
+  { value: 604800, label: '7 أيام' },
+  { value: 7776000, label: '90 يوماً' }
+];
+
+export default function GroupInfo({ conversation, currentUserId, onClose, onMembersUpdated, onRemoveMember, disappearingAfter, onDisappearingChange }) {
   const isCreator = Number(conversation?.created_by) === Number(currentUserId);
   const memberIds = conversation?.memberIds || [];
   const memberDetails = conversation?.memberDetails || [];
@@ -60,6 +67,16 @@ export default function GroupInfo({ conversation, currentUserId, onClose, onMemb
           <h2 style={{ margin: 0, fontSize: 20 }}>{conversation?.name || 'المجموعة'}</h2>
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--text)' }}>×</button>
         </div>
+        {onDisappearingChange && (
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>رسائل مؤقتة</p>
+            <select value={disappearingAfter ?? ''} onChange={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); onDisappearingChange(v); }} style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)' }}>
+              {DISAPPEARING_OPTS.map((o) => (
+                <option key={String(o.value)} value={o.value ?? ''}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>الأعضاء ({members.length})</p>
         {members.map((m) => (
           <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>

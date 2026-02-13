@@ -93,9 +93,13 @@ export async function subscribePush(subscription) {
 }
 
 export async function createInviteLink() {
-  const res = await fetch(`${API_BASE}/api/invite-links`, { method: 'POST', headers: headers() });
+  const url = `${API_BASE}/api/invite-links`;
+  const res = await fetch(url, { method: 'POST', headers: headers() });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'فشل إنشاء الرابط');
+  if (!res.ok) {
+    const msg = data.error || `خطأ ${res.status}`;
+    throw new Error(msg);
+  }
   return data;
 }
 

@@ -1,226 +1,248 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import EmojiPicker from 'emoji-picker-react';
 import * as api from './api';
-import GroupInfo from './GroupInfo';
 
-const s = {
+function PollCreateModal({ onClose, onSent }) {
+  const [question, setQuestion] = useState('');
+  const [options, setOptions] = useState(['', '']);
+  const addOpt = () => { if (options.length < 10) setOptions((o) => [...o, '']); };
+  const rmOpt = (i) => { if (options.length > 2) setOptions((o) => o.filter((_, j) => j !== i)); };
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const opts = options.filter((o) => String(o).trim());
+    if (!question.trim() || opts.length < 2) return;
+    onSent(JSON.stringify({ question: question.trim(), options: opts }));
+  };
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 150 }} onClick={onClose}>
+      <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 360, width: '100%', border: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 12px' }}>استطلاع جديد</h3>
+        <form onSubmit={handleSubmit}>
+          <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="السؤال" required style={{ width: '100%', padding: 10, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)' }} />
+          {options.map((opt, i) => (
+            <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+              <input type="text" value={opt} onChange={(e) => setOptions((o) => o.map((x, j) => j === i ? e.target.value : x))} placeholder={`الخيار ${i + 1}`} style={{ flex: 1, padding: 8, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)' }} />
+              <button type="button" onClick={() => rmOpt(i)} style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>−</button>
+            </div>
+          ))}
+          {options.length < 10 && <button type="button" onClick={addOpt} style={{ marginBottom: 12, padding: '6px 12px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>+ خيار</button>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit" style={{ padding: '10px 20px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>إرسال</button>
+            <button type="button" onClick={onClose} style={{ padding: '10px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إلغاء</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+import GroupInfo from './GroupInfo';
+import CallModal from './CallModal';
+import WebRTCCall from './WebRTCCall';
+import GifPicker from './GifPicker';
+import * as e2e from './e2e';
+import { playSent, stopCallRing } from './sounds';
+
+const styles = {
   room: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid var(--border)' },
   header: { padding: 12, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 },
   backBtn: { padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' },
   messages: { flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 },
   msg: { maxWidth: '80%', padding: '10px 14px', borderRadius: 12, alignSelf: 'flex-start', wordBreak: 'break-word' },
-  msgOwn: { alignSelf: 'flex-end', background: 'var(--msg-bg-own)', color: 'var(--msg-text-own, #fff)' },
-  msgOther: { background: 'var(--msg-bg-other, var(--surface))', border: '1px solid var(--border)' },
-  msgMeta: { fontSize: 11, marginTop: 4 },
-  msgMetaOwn: { color: 'var(--msg-meta-own, rgba(255,255,255,0.82))' },
-  msgMetaOther: { color: 'var(--msg-action-color, #4a5568)' },
-  replyBar: { fontSize: 12, opacity: 0.9, padding: '6px 10px', borderRight: '3px solid var(--primary)', marginBottom: 6, background: 'rgba(0,0,0,0.15)', borderRadius: 4 },
-  form: { padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' },
+  msgOwn: { alignSelf: 'flex-end', background: 'var(--msg-bg-own, var(--primary))', color: 'var(--msg-text-own)' },
+  msgOther: { background: 'var(--msg-bg-other)', color: 'var(--msg-text-other, var(--text))', border: '1px solid var(--border)' },
+  msgMeta: { fontSize: 11, opacity: 0.8, marginTop: 4 },
+  form: { padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' },
   input: { flex: 1, minWidth: 120, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 15, minHeight: 44, textAlign: 'right' },
   sendBtn: { padding: '10px 20px', border: 'none', borderRadius: 8, background: 'var(--primary)', color: '#fff', cursor: 'pointer', fontSize: 15 },
-  fileBtn: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' },
-  emojiBtn: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontSize: 18 },
+  fileBtn: { padding: 10, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontSize: 18 },
   img: { maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginTop: 4 },
-  link: { color: 'var(--primary)', wordBreak: 'break-all' },
-  typingBar: { padding: '4px 12px', fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' },
-  replyPreview: { padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 6, marginBottom: 6, fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  replyBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 6px' },
-  replyBtnOwn: { color: 'var(--msg-meta-own, rgba(255,255,255,0.82))' },
-  replyBtnOther: { color: 'var(--msg-action-color, #4a5568)' },
-  deleteBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '2px 6px' },
-  deleteBtnOwn: { color: 'var(--msg-meta-own, rgba(255,255,255,0.82))' },
-  deleteBtnOther: { color: 'var(--msg-action-color, #4a5568)' },
-  voiceBtn: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontSize: 16 },
-  audio: { maxWidth: '100%', minWidth: 200, marginTop: 4 },
-  callModal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 },
-  callModalBox: { background: 'var(--surface)', borderRadius: 12, padding: 24, textAlign: 'center', minWidth: 260 },
-  callBar: { padding: 10, background: 'var(--surface)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  callVideoWrap: { position: 'fixed', inset: 0, background: '#000', zIndex: 40, display: 'flex', flexDirection: 'column' },
-  remoteVideo: { flex: 1, width: '100%', objectFit: 'contain' },
-  localVideo: { position: 'absolute', bottom: 80, right: 16, width: 120, height: 90, objectFit: 'cover', borderRadius: 8, border: '2px solid var(--border)' },
-  hangupBtn: { position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', padding: '12px 24px', background: '#f85149', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 16 },
-  locationBtn: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontSize: 16 },
-  searchRow: { padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center' },
-  searchInput: { flex: 1, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 14 },
-  loadMoreBtn: { padding: '8px 16px', margin: '8px auto', display: 'block', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 },
-  copyBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 6px' },
-  copyBtnOwn: { color: 'var(--msg-meta-own, rgba(255,255,255,0.82))' },
-  copyBtnOther: { color: 'var(--msg-action-color, #4a5568)' }
+  link: { color: 'var(--primary)', wordBreak: 'break-all' }
 };
 
-export default function ChatRoom({ conversation, socket, currentUserId, onBack, isAdmin, onBlockUser, onLeaveGroup, onDeleteGroup, onRemoveMember, onConversationUpdate }) {
+export default function ChatRoom({ conversation, conversations = [], socket, currentUserId, onBack, onMembersUpdated }) {
   const [messages, setMessages] = useState([]);
+  const [convDetails, setConvDetails] = useState(conversation);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [fileError, setFileError] = useState('');
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
   const [optimisticVersion, setOptimisticVersion] = useState(0);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [callState, setCallState] = useState(null);
   const [typingUser, setTypingUser] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
-  const [readReceipts, setReadReceipts] = useState({});
-  const [isRecording, setIsRecording] = useState(false);
-  const [voiceError, setVoiceError] = useState('');
-  const [locationError, setLocationError] = useState('');
+  const [msgMenuId, setMsgMenuId] = useState(null);
+  const [groupCallParticipants, setGroupCallParticipants] = useState(null);
+  const [readReceipts, setReadReceipts] = useState([]);
+  const [reactions, setReactions] = useState({});
+  const [pollVotes, setPollVotes] = useState([]);
+  const [showPollCreate, setShowPollCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [copyDoneId, setCopyDoneId] = useState(null);
-  const [callState, setCallState] = useState('idle');
-  const [incomingCallFrom, setIncomingCallFrom] = useState(null);
+  const [showForward, setShowForward] = useState(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [webrtcCall, setWebrtcCall] = useState(null);
+  const [e2eReady, setE2eReady] = useState(false);
+  const [e2eTheirKey, setE2eTheirKey] = useState(null);
+  const [decryptedMap, setDecryptedMap] = useState({});
+  const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const optimisticRef = useRef([]);
-  const typingTimeoutRef = useRef(null);
-  const emojiPickerRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+  const emojiWrapRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const peerConnectionRef = useRef(null);
-  const localStreamRef = useRef(null);
-  const remoteAudioRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const localVideoRef = useRef(null);
-  const pendingOfferRef = useRef(null);
-  const incomingCallRingRef = useRef(null);
-  const [callWithVideo, setCallWithVideo] = useState(true);
-  const [hasLocalStream, setHasLocalStream] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState(null);
-  const [showCallTargetPicker, setShowCallTargetPicker] = useState(false);
-  const [callTargetUserId, setCallTargetUserId] = useState(null);
-  const [showGroupMenu, setShowGroupMenu] = useState(false);
-  const [showGroupInfo, setShowGroupInfo] = useState(false);
-  const [groupCallActive, setGroupCallActive] = useState(null);
-  const [groupCallParticipants, setGroupCallParticipants] = useState([]);
-  const groupCallHostRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
-  }, []);
+  const optimisticRef = useRef([]);
+  const sentPlaintextQueueRef = useRef([]);
 
   useEffect(() => {
     if (!conversation?.id) return;
+    setConvDetails(conversation);
     optimisticRef.current = [];
+    setDecryptedMap({});
     setLoading(true);
-    setReplyTo(null);
     api.getMessages(conversation.id).then((data) => {
-      const list = data.messages || [];
-      const receipts = (data.readReceipts || []).reduce((acc, r) => ({ ...acc, [r.user_id]: r.last_message_id }), {});
+      const { messages: list = [], readReceipts: rr = [], reactions: rx = [], pollVotes: pv = [] } = typeof data === 'object' && data ? data : { messages: [], readReceipts: [], reactions: [], pollVotes: [] };
       setMessages(Array.isArray(list) ? list : []);
-      setReadReceipts(receipts);
+      setReadReceipts(Array.isArray(rr) ? rr : []);
+      const byMsg = {};
+      (Array.isArray(rx) ? rx : []).forEach((r) => { if (!byMsg[r.message_id]) byMsg[r.message_id] = []; byMsg[r.message_id].push(r); });
+      setReactions(byMsg);
+      setPollVotes(Array.isArray(pv) ? pv : []);
       setLoading(false);
-      const maxId = list.length ? Math.max(...list.map((m) => m.id)) : null;
-      if (socket && maxId != null) socket.emit('mark_read', { conversationId: conversation.id, lastMessageId: maxId });
     }).catch(() => setLoading(false));
-    if (socket) {
+    api.getConversation(conversation.id).then((c) => setConvDetails(c)).catch(() => {});
+  }, [conversation?.id]);
+
+  const isGroupConv = convDetails?.type === 'group';
+  const membersList = convDetails?.members || convDetails?.memberIds || conversation?.members || conversation?.memberIds || [];
+  const otherUserIdConv = !isGroupConv && membersList.length ? membersList.find((m) => Number(m) !== Number(currentUserId)) : null;
+
+  useEffect(() => {
+    if (!conversation?.id || isGroupConv || !otherUserIdConv) {
+      setE2eReady(false);
+      setE2eTheirKey(null);
+      setDecryptedMap({});
+      return;
+    }
+    (async () => {
+      try {
+        const { publicKey } = await e2e.initE2EKeys();
+        if (!publicKey) return;
+        await api.setMyE2EPublicKey(publicKey);
+        const theirKey = await api.getUserE2EPublicKey(otherUserIdConv);
+        setE2eTheirKey(theirKey);
+        setE2eReady(!!theirKey);
+      } catch (_) {
+        setE2eReady(false);
+      }
+    })();
+  }, [conversation?.id, isGroupConv, otherUserIdConv]);
+
+  useEffect(() => {
+    const enc = (messages || []).filter((m) => m.encrypted && m.content && m.iv && m.sender_public_key && !m.deleted);
+    if (enc.length === 0) return;
+    let cancelled = false;
+    enc.forEach(async (m) => {
+      const dec = await e2e.decryptFromUser(m.content, m.iv, m.sender_public_key);
+      if (!cancelled && dec != null) setDecryptedMap((prev) => (prev[m.id] ? prev : { ...prev, [m.id]: dec }));
+    });
+    return () => { cancelled = true; };
+  }, [messages]);
+
+  const lastRealMessageIdRef = useRef(null);
+  useEffect(() => {
+    if (!socket || !conversation?.id) return;
+    const real = (messages || []).filter((m) => m.id && !String(m.id).startsWith('temp-'));
+    const last = real[real.length - 1];
+    const lastId = last?.id ?? null;
+    if (lastId !== lastRealMessageIdRef.current) {
+      lastRealMessageIdRef.current = lastId;
+      socket.emit('mark_read', { conversationId: conversation.id, lastMessageId: lastId });
+    }
+  }, [conversation?.id, socket, messages]);
+
+  useEffect(() => {
+    if (socket && conversation?.id) {
       socket.emit('join_conversation', conversation.id);
       const onNew = (msg) => {
         if (msg.conversation_id !== conversation.id) return;
-        optimisticRef.current = optimisticRef.current.filter((o) => !(o.content === msg.content && o.sender_id === msg.sender_id && o.type === msg.type));
+        const isOwn = Number(msg.sender_id) === Number(currentUserId);
+        if (isOwn && msg.encrypted && sentPlaintextQueueRef.current.length > 0) {
+          const plain = sentPlaintextQueueRef.current.shift();
+          setDecryptedMap((prev) => ({ ...prev, [msg.id]: plain }));
+          let idx = -1;
+          for (let i = optimisticRef.current.length - 1; i >= 0; i--) {
+            if (String(optimisticRef.current[i].sender_id) === String(currentUserId) && optimisticRef.current[i].type === 'text') {
+              idx = i;
+              break;
+            }
+          }
+          if (idx >= 0) optimisticRef.current.splice(idx, 1);
+        } else {
+          optimisticRef.current = optimisticRef.current.filter(
+            (o) => !(o.content === msg.content && o.sender_id === msg.sender_id && o.type === msg.type)
+          );
+        }
         setOptimisticVersion((v) => v + 1);
         setMessages((prev) => [...prev, msg]);
-        if (Number(msg.sender_id) !== Number(currentUserId)) {
-          if (msg.id != null) socket.emit('mark_read', { conversationId: conversation.id, lastMessageId: msg.id });
-          playNotificationSound();
-          if (document.hidden && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            try {
-              const sender = msg.sender?.name || msg.sender?.email || msg.sender?.phone || 'شخص';
-              const body = msg.type === 'text' ? (msg.content || '').slice(0, 80) : msg.type === 'image' ? '🖼 صورة' : msg.type === 'voice' ? '🎤 رسالة صوتية' : 'رسالة جديدة';
-              new Notification(`${conversation.label || 'محادثة'} — ${sender}`, { body, icon: '/icon-192.png' });
-            } catch (_) {}
-          }
-        }
+      };
+      const onCallRejected = (data) => {
+        if (data.conversationId === conversation.id) { setCallState(null); setWebrtcCall(null); stopCallRing(); }
+      };
+      const onCallAnswered = (data) => {
+        if (data.conversationId !== conversation.id) return;
+        setWebrtcCall({ remoteUserId: data.calleeUserId, isVideo: callState?.isVoice === false });
+      };
+      const onCallEnded = (data) => {
+        if (data.conversationId === conversation.id) { setCallState(null); setWebrtcCall(null); stopCallRing(); }
       };
       const onTyping = (data) => {
-        if (data.userId === currentUserId) return;
-        setTypingUser(data.userName || 'شخص');
+        if (Number(data.userId) === Number(currentUserId)) return;
+        setTypingUser({ id: data.userId, name: data.userName });
       };
       const onStopTyping = (data) => {
-        if (data.userId === currentUserId) return;
+        if (Number(data.userId) === Number(currentUserId)) return;
         setTypingUser(null);
       };
-      const onMessageDeleted = (data) => {
+      const onDeleted = (data) => {
         if (data.conversationId !== conversation.id) return;
-        setMessages((prev) => prev.map((m) => (m.id === data.messageId ? { ...m, deleted: true, content: '', file_name: null, type: 'text' } : m)));
-        optimisticRef.current = optimisticRef.current.map((m) => (m.id === data.messageId ? { ...m, deleted: true, content: '', file_name: null, type: 'text' } : m));
-        setOptimisticVersion((v) => v + 1);
+        const { messageId } = data;
+        setMessages((prev) => prev.map((m) => (m.id === messageId || String(m.id) === String(messageId)) ? { ...m, content: '', type: 'text', deleted: true } : m));
+        setMsgMenuId(null);
       };
       const onReadReceipt = (data) => {
         if (data.conversationId !== conversation.id) return;
-        setReadReceipts((prev) => ({ ...prev, [data.userId]: data.lastMessageId }));
+        setReadReceipts((prev) => {
+          const rest = prev.filter((r) => r.user_id !== data.userId);
+          if (data.lastMessageId != null) rest.push({ user_id: data.userId, last_message_id: data.lastMessageId });
+          return rest;
+        });
       };
-      const onIncomingCall = (data) => {
-        if (data.conversationId !== conversation.id) return;
-        setIncomingCallFrom({ userId: data.fromUserId, userName: data.fromUserName || 'شخص' });
-        setCallState('incoming');
+      const onReactionAdded = (data) => {
+        const { messageId, userId, emoji } = data;
+        setReactions((prev) => {
+          const list = (prev[messageId] || []).filter((r) => r.user_id !== userId);
+          return { ...prev, [messageId]: [...list, { message_id: messageId, user_id: userId, emoji }] };
+        });
       };
-      const onWebRTCSignal = async (data) => {
-        if (data.conversationId !== conversation.id) return;
-        const { signal, fromUserId } = data;
-        if (signal.type === 'offer') {
-          const inGroupCall = groupCallHostRef.current && localStreamRef.current;
-          if (inGroupCall && fromUserId) {
-            try {
-              const pc = createPeerConnection(fromUserId);
-              peerConnectionRef.current = pc;
-              localStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, localStreamRef.current));
-              await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: signal.sdp }));
-              const answer = await pc.createAnswer();
-              await pc.setLocalDescription(answer);
-              socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: fromUserId, signal: { type: 'answer', sdp: answer.sdp } });
-            } catch (_) {}
-          } else {
-            pendingOfferRef.current = { type: 'offer', sdp: signal.sdp };
-          }
-        }
-        if (signal.type === 'answer' && peerConnectionRef.current) {
-          peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: signal.sdp })).then(() => setCallState('connected')).catch(() => {});
-        }
-        if (signal.type === 'ice' && signal.candidate && peerConnectionRef.current) {
-          peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(() => {});
-        }
+      const onReactionRemoved = (data) => {
+        const { messageId, userId } = data;
+        setReactions((prev) => {
+          const list = (prev[messageId] || []).filter((r) => r.user_id !== userId);
+          if (list.length === 0) { const next = { ...prev }; delete next[messageId]; return next; }
+          return { ...prev, [messageId]: list };
+        });
       };
-      const onCallRejected = (data) => {
+      const onPollVoted = (data) => {
         if (data.conversationId !== conversation.id) return;
-        setCallState('idle');
-        setHasLocalStream(false);
-        if (peerConnectionRef.current) {
-          peerConnectionRef.current.close();
-          peerConnectionRef.current = null;
-        }
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach((t) => t.stop());
-          localStreamRef.current = null;
-        }
-      };
-      const onCallEnded = (data) => {
-        if (data.conversationId !== conversation.id) return;
-        setCallState('idle');
-        setIncomingCallFrom(null);
-        setCallTargetUserId(null);
-        if (peerConnectionRef.current) {
-          peerConnectionRef.current.close();
-          peerConnectionRef.current = null;
-        }
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach((t) => t.stop());
-          localStreamRef.current = null;
-        }
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-        if (localVideoRef.current) localVideoRef.current.srcObject = null;
-        setHasLocalStream(false);
+        setPollVotes((prev) => prev.filter((v) => !(v.message_id === data.messageId && v.user_id === data.userId)).concat([{ message_id: data.messageId, user_id: data.userId, option_index: data.optionIndex }]));
       };
       socket.on('new_message', onNew);
-      socket.on('user_typing', onTyping);
-      socket.on('user_stop_typing', onStopTyping);
-      socket.on('message_deleted', onMessageDeleted);
-      socket.on('read_receipt', onReadReceipt);
-      socket.on('incoming_call', onIncomingCall);
-      socket.on('webrtc_signal', onWebRTCSignal);
-      socket.on('call_rejected', onCallRejected);
-      socket.on('call_ended', onCallEnded);
+      socket.on('message_deleted', onDeleted);
       const onGroupCallStarted = (data) => {
         if (data.conversationId !== conversation.id) return;
-        setGroupCallActive({ initiatorId: data.initiatorId, initiatorName: data.initiatorName });
         setGroupCallParticipants(data.participants || []);
       };
       const onGroupCallUserJoined = (data) => {
@@ -229,742 +251,414 @@ export default function ChatRoom({ conversation, socket, currentUserId, onBack, 
       };
       const onGroupCallUserLeft = (data) => {
         if (data.conversationId !== conversation.id) return;
-        setGroupCallParticipants(data.participants || []);
-        if (data.participants.length === 0) setGroupCallActive(null);
-      };
-      const onGroupCallYouJoined = (data) => {
-        if (data.conversationId !== conversation.id) return;
-        setGroupCallParticipants(data.participants || []);
+        setGroupCallParticipants((p) => (data.participants && data.participants.length > 0) ? data.participants : null);
       };
       socket.on('group_call_started', onGroupCallStarted);
       socket.on('group_call_user_joined', onGroupCallUserJoined);
       socket.on('group_call_user_left', onGroupCallUserLeft);
-      socket.on('group_call_you_joined', onGroupCallYouJoined);
+      socket.on('user_typing', onTyping);
+      socket.on('user_stop_typing', onStopTyping);
+      socket.on('call_answered', onCallAnswered);
+      socket.on('call_rejected', onCallRejected);
+      socket.on('call_ended', onCallEnded);
+      socket.on('read_receipt', onReadReceipt);
+      socket.on('reaction_added', onReactionAdded);
+      socket.on('reaction_removed', onReactionRemoved);
+      socket.on('poll_voted', onPollVoted);
       return () => {
         socket.off('new_message', onNew);
-        socket.off('user_typing', onTyping);
-        socket.off('user_stop_typing', onStopTyping);
-        socket.off('message_deleted', onMessageDeleted);
+        socket.off('message_deleted', onDeleted);
         socket.off('read_receipt', onReadReceipt);
-        socket.off('incoming_call', onIncomingCall);
-        socket.off('webrtc_signal', onWebRTCSignal);
-        socket.off('call_rejected', onCallRejected);
-        socket.off('call_ended', onCallEnded);
+        socket.off('reaction_added', onReactionAdded);
+        socket.off('reaction_removed', onReactionRemoved);
+        socket.off('poll_voted', onPollVoted);
         socket.off('group_call_started', onGroupCallStarted);
         socket.off('group_call_user_joined', onGroupCallUserJoined);
         socket.off('group_call_user_left', onGroupCallUserLeft);
-        socket.off('group_call_you_joined', onGroupCallYouJoined);
+        socket.off('user_typing', onTyping);
+        socket.off('user_stop_typing', onStopTyping);
+        socket.off('call_answered', onCallAnswered);
+        socket.off('call_rejected', onCallRejected);
+        socket.off('call_ended', onCallEnded);
         socket.emit('leave_conversation', conversation.id);
       };
     }
-  }, [conversation?.id, socket, currentUserId]);
+  }, [conversation?.id, socket, callState?.targetId, callState?.isVoice]);
+
+  useEffect(() => {
+    const close = (e) => {
+      if (emojiWrapRef.current && !emojiWrapRef.current.contains(e.target)) setShowEmoji(false);
+      if (msgMenuId && !e.target.closest('[data-msg-id]')) setMsgMenuId(null);
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [msgMenuId]);
 
   const displayMessages = useMemo(() => {
     const fromServer = messages || [];
     const pending = optimisticRef.current || [];
     const serverIds = new Set(fromServer.map((m) => m.id));
     const extra = pending.filter((p) => !serverIds.has(p.id));
-    return [...fromServer, ...extra].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-  }, [messages, optimisticVersion]);
-
-  const filteredMessages = useMemo(() => {
-    if (!searchQuery.trim()) return displayMessages;
-    const q = searchQuery.trim().toLowerCase();
-    return displayMessages.filter((m) => {
-      if (m.deleted) return false;
-      if (m.type === 'text') return (m.content || '').toLowerCase().includes(q);
-      if (m.type === 'file' && m.file_name) return String(m.file_name).toLowerCase().includes(q);
-      if (m.type === 'location') return (m.content || '').toLowerCase().includes(q) || 'موقع'.includes(q);
-      return false;
-    });
-  }, [displayMessages, searchQuery]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayMessages]);
-
-  const loadMoreMessages = async () => {
-    if (!conversation?.id || loadingMore) return;
-    const numericIds = messages.filter((m) => typeof m.id === 'number').map((m) => m.id);
-    if (!numericIds.length) return;
-    const oldestId = Math.min(...numericIds);
-    setLoadingMore(true);
-    try {
-      const data = await api.getMessages(conversation.id, 50, oldestId);
-      const newList = data.messages || [];
-      const existingIds = new Set(messages.map((m) => m.id));
-      const toAdd = newList.filter((m) => !existingIds.has(m.id));
-      if (toAdd.length) setMessages((prev) => [...toAdd, ...prev]);
-      if (data.readReceipts?.length) setReadReceipts((prev) => ({ ...prev, ...(data.readReceipts || []).reduce((acc, r) => ({ ...acc, [r.user_id]: r.last_message_id }), {}) }));
-    } finally {
-      setLoadingMore(false);
+    let list = [...fromServer, ...extra].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (q) {
+      const keys = { image: ['صورة', 'image', 'صور', 'gif'], video: ['فيديو', 'video'], voice: ['صوت', 'voice', 'رسالة صوتية'], location: ['موقع', 'location'] };
+      list = list.filter((m) => {
+        if (m.deleted) return false;
+        const textContent = m.type === 'text' ? (m.encrypted ? (decryptedMap[m.id] || '') : (m.content || '')) : '';
+        if (m.type === 'text' && textContent.toLowerCase().includes(q)) return true;
+        if (m.type === 'image' && keys.image.some((k) => k.includes(q) || q.includes(k))) return true;
+        if (m.type === 'video' && keys.video.some((k) => k.includes(q) || q.includes(k))) return true;
+        if (m.type === 'voice' && keys.voice.some((k) => k.includes(q) || q.includes(k))) return true;
+        if (m.type === 'location' && keys.location.some((k) => k.includes(q) || q.includes(k))) return true;
+        if ((m.file_name || '').toLowerCase().includes(q)) return true;
+        return false;
+      });
     }
-  };
+    return list;
+  }, [messages, optimisticVersion, searchQuery, decryptedMap]);
 
-  const copyMessageText = (m) => {
-    const text = m.type === 'text' ? m.content : m.type === 'location' ? m.content : '';
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-      setCopyDoneId(m.id);
-      setTimeout(() => setCopyDoneId(null), 1500);
-    });
-  };
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [displayMessages]);
 
-  useEffect(() => {
-    if ((callState === 'calling' || callState === 'connected' || callState === 'group_call') && hasLocalStream && localStreamRef.current && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
-    }
-  }, [callState, hasLocalStream]);
-
-  useEffect(() => {
-    if (callState === 'incoming') {
-      playIncomingCallRing();
-      const id = setInterval(playIncomingCallRing, 2000);
-      incomingCallRingRef.current = id;
-      return () => {
-        if (incomingCallRingRef.current) clearInterval(incomingCallRingRef.current);
-        incomingCallRingRef.current = null;
-      };
-    } else {
-      if (incomingCallRingRef.current) clearInterval(incomingCallRingRef.current);
-      incomingCallRingRef.current = null;
-    }
-  }, [callState]);
-
-  const emitTyping = useCallback(() => {
+  const emitTyping = () => {
     if (!socket || !conversation?.id) return;
     socket.emit('typing', { conversationId: conversation.id });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      socket.emit('stop_typing', { conversationId: conversation.id });
+      socket?.emit('stop_typing', { conversationId: conversation.id });
       typingTimeoutRef.current = null;
     }, 2000);
-  }, [socket, conversation?.id]);
+  };
 
-  const sendMessage = (type, content, file_name = null, reply_to_id = null, reply_to_snippet = null) => {
+  const handleDeleteMsg = (msg, forEveryone) => {
+    if (!socket || !conversation?.id) return;
+    socket.emit('delete_message', { conversationId: conversation.id, messageId: msg.id, forEveryone });
+    if (!forEveryone) setMessages((prev) => prev.filter((m) => m.id !== msg.id && String(m.id) !== String(msg.id)));
+    setMsgMenuId(null);
+  };
+
+  const getMsgSnippet = (m) => {
+    if (m.deleted) return 'رسالة محذوفة';
+    if (m.type === 'poll') { try { const p = JSON.parse(m.content || '{}'); return '📊 ' + (p.question || 'استطلاع'); } catch (_) { return '📊 استطلاع'; } }
+    if (m.type === 'text') return (m.encrypted ? (decryptedMap[m.id] || 'رسالة مشفرة') : (m.content || '')).slice(0, 50) || 'رسالة';
+    if (m.type === 'image') return '🖼 صورة';
+    if (m.type === 'video') return '🎬 فيديو';
+    if (m.type === 'voice') return '🎤 رسالة صوتية';
+    if (m.type === 'location') return '📍 موقع';
+    return m.file_name || 'ملف';
+  };
+
+  const sendMessage = async (type = 'text', content, file_name = null, replyToMsg = null) => {
     if (!content && type === 'text') return;
-    if (socket) socket.emit('stop_typing', { conversationId: conversation.id });
     const tempId = 'temp-' + Date.now();
-    optimisticRef.current = [...optimisticRef.current, {
-      id: tempId,
-      content,
-      sender_id: currentUserId,
-      type: type === 'text' ? 'text' : type,
-      file_name: file_name || null,
-      reply_to_id: reply_to_id || null,
-      reply_to_snippet: reply_to_snippet || null,
-      created_at: new Date().toISOString(),
-      sender: null
-    }];
+    const tempMsg = { id: tempId, content, sender_id: currentUserId, type: type === 'text' ? 'text' : type, file_name, reply_to_id: replyToMsg?.id, reply_to_snippet: replyToMsg ? getMsgSnippet(replyToMsg) : null, created_at: new Date().toISOString(), sender: null };
+    optimisticRef.current = [...optimisticRef.current, tempMsg];
     setOptimisticVersion((v) => v + 1);
     if (type === 'text') setText('');
     setReplyTo(null);
-    playSendSound();
-    if (socket) socket.emit('send_message', {
-      conversationId: conversation.id,
-      type,
-      content,
-      file_name,
-      reply_to_id: reply_to_id || undefined,
-      reply_to_snippet: reply_to_snippet || undefined
-    });
+    if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
+    let payload = { conversationId: conversation.id, type, content, file_name };
+    if (replyToMsg) { payload.reply_to_id = replyToMsg.id; payload.reply_to_snippet = getMsgSnippet(replyToMsg); }
+    if (type === 'text' && e2eReady && e2eTheirKey) {
+      try {
+        sentPlaintextQueueRef.current.push(content);
+        const { content: cipher, iv } = await e2e.encryptForUser(content, e2eTheirKey);
+        payload = { ...payload, content: cipher, encrypted: true, iv };
+      } catch (_) {
+        setFileError('فشل التشفير');
+        return;
+      }
+    }
+    if (socket) { socket.emit('stop_typing', { conversationId: conversation.id }); socket.emit('send_message', payload); }
+    playSent();
   };
 
-  const handleFile = async (e) => {
+  const handleFile = async (e, imageOnly = false, replyToMsg = null) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileError('');
     try {
       const { url, filename } = await api.uploadFile(file);
       const fullUrl = api.uploadsUrl(url);
-      sendMessage((file.type || '').startsWith('image/') ? 'image' : 'file', fullUrl, filename);
+      const type = (file.type || '').startsWith('image/') ? 'image' : (file.type || '').startsWith('video/') ? 'video' : (file.type || '').startsWith('audio/') ? 'voice' : 'file';
+      sendMessage(type, fullUrl, filename || (type === 'voice' ? 'رسالة صوتية' : file.name), replyToMsg ?? replyTo);
     } catch (err) {
       setFileError(err.message || 'فشل رفع الملف');
     }
     e.target.value = '';
   };
 
-  const getReplySnippet = (m) => {
-    if (!m) return '';
-    if (m.type === 'text') return (m.content || '').slice(0, 50);
-    if (m.type === 'image') return '🖼 صورة';
-    if (m.type === 'file') return '📎 ' + (m.file_name || 'ملف');
-    if (m.type === 'voice') return '🎤 رسالة صوتية';
-    if (m.type === 'location') return '📍 موقع';
-    return '';
-  };
-
-  const playNotificationSound = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.connect(ctx.destination);
-      const playTone = (freq, start, dur) => {
-        const osc = ctx.createOscillator();
-        osc.connect(gain);
-        osc.frequency.value = freq;
-        osc.type = 'sine';
-        osc.start(ctx.currentTime + start);
-        osc.stop(ctx.currentTime + start + dur);
-      };
-      playTone(880, 0, 0.08);
-      playTone(1100, 0.1, 0.12);
-    } catch (_) {}
-  };
-
-  const playIncomingCallRing = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.connect(ctx.destination);
-      const t = ctx.currentTime;
-      const osc1 = ctx.createOscillator();
-      osc1.connect(gain);
-      osc1.frequency.value = 800;
-      osc1.type = 'sine';
-      osc1.start(t);
-      osc1.stop(t + 0.4);
-      const osc2 = ctx.createOscillator();
-      osc2.connect(gain);
-      osc2.frequency.value = 1000;
-      osc2.type = 'sine';
-      osc2.start(t + 0.2);
-      osc2.stop(t + 0.6);
-    } catch (_) {}
-  };
-
-  const playSendSound = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
-      gain.connect(ctx.destination);
-      const osc = ctx.createOscillator();
-      osc.connect(gain);
-      osc.frequency.value = 600;
-      osc.type = 'sine';
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.06);
-    } catch (_) {}
-  };
-
-  const startVoiceRecording = () => {
-    setVoiceError('');
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setVoiceError('المتصفح لا يدعم التسجيل الصوتي');
-      return;
-    }
-    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-      audioChunksRef.current = [];
-      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
-      const recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: mime });
-        const ext = mime.includes('webm') ? 'webm' : 'ogg';
-        const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: mime });
-        api.uploadFile(file).then(({ url, filename }) => {
-          const fullUrl = api.uploadsUrl(url);
-          sendMessage('voice', fullUrl, 'رسالة صوتية');
-        }).catch((err) => setVoiceError(err.message || 'فشل رفع الرسالة الصوتية'));
-      };
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
-    }).catch(() => setVoiceError('لم يتم السماح بالميكروفون'));
-  };
-
-  const shareLocation = () => {
-    setLocationError('');
-    if (!navigator.geolocation) {
-      setLocationError('المتصفح لا يدعم الموقع');
-      return;
-    }
+  const handleLocation = () => {
+    if (!navigator.geolocation) { setFileError('المتصفح لا يدعم الموقع'); return; }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
         const url = `https://www.google.com/maps?q=${latitude},${longitude}`;
-        sendMessage('location', url, 'موقع');
+        const label = `📍 موقعي: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        sendMessage('location', `${label}\n${url}`, null, replyTo);
       },
-      () => setLocationError('لم يتم الحصول على الموقع أو تم رفض الإذن'),
-      { enableHighAccuracy: true, timeout: 10000 }
+      () => setFileError('فشل الحصول على الموقع')
     );
   };
 
-  const stopVoiceRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size) audioChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (audioChunksRef.current.length === 0) return;
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const file = new File([blob], 'voice.webm', { type: 'audio/webm' });
+        const fakeEvent = { target: { files: [file] } };
+        handleFile(fakeEvent, false, replyTo ?? undefined);
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setIsRecording(true);
+    } catch (err) {
+      setFileError(err.message || 'فشل تشغيل الميكروفون');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current = null;
     }
     setIsRecording(false);
   };
 
-  const otherUserId = useMemo(() => {
-    const ids = conversation?.memberIds || [];
-    if (ids.length !== 2) return callTargetUserId ?? ids.find((id) => Number(id) !== Number(currentUserId)) ?? null;
-    return callTargetUserId ?? ids.find((id) => Number(id) !== Number(currentUserId)) ?? null;
-  }, [conversation?.memberIds, currentUserId, callTargetUserId]);
-
-  const isDirectTwo = conversation?.type === 'direct' && otherUserId != null;
-  const isGroupCallable = conversation?.type === 'group' && (conversation?.memberIds || []).length >= 2;
-
-  const groupMembers = useMemo(() => {
-    if (conversation?.type !== 'group') return [];
-    const ids = conversation?.memberIds || [];
-    const details = conversation?.memberDetails || [];
-    return ids.filter((id) => Number(id) !== Number(currentUserId)).map((id) => {
-      const d = details.find((m) => Number(m.id) === Number(id));
-      return { id, name: d?.name || d?.email || d?.phone || 'عضو', avatar_url: d?.avatar_url };
-    });
-  }, [conversation, currentUserId]);
-
-  const createPeerConnection = (targetUserId = null) => {
-    const iceServers = [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun3.l.google.com:19302' }
-    ];
-    const turnUri = import.meta.env.VITE_TURN_URI;
-    if (turnUri) {
-      const turn = { urls: turnUri };
-      const u = import.meta.env.VITE_TURN_USERNAME;
-      const c = import.meta.env.VITE_TURN_CREDENTIAL;
-      if (u && c) {
-        turn.username = u;
-        turn.credential = c;
-      }
-      iceServers.push(turn);
-    }
-    const pc = new RTCPeerConnection({ iceServers });
-    pc.ontrack = (e) => {
-      if (!e.streams?.[0]) return;
-      const stream = e.streams[0];
-      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
-    };
-    pc.onicecandidate = (e) => {
-      const t = targetUserId ?? otherUserId;
-      if (e.candidate && socket && conversation?.id && t != null) {
-        socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: t, signal: { type: 'ice', candidate: e.candidate } });
-      }
-    };
-    return pc;
+  const startCall = (isVoice) => {
+    const targetId = convDetails?.type === 'direct'
+      ? (convDetails?.members || []).find((m) => Number(m) !== Number(currentUserId))
+      : null;
+    if (!targetId) return;
+    setCallState({ isVoice, targetId });
+    socket?.emit('start_call', { conversationId: conversation.id, toUserId: targetId });
   };
 
-  const startCall = async (withVideo = true, targetId = null) => {
-    const target = targetId ?? otherUserId;
-    if (!socket || !conversation?.id || !target) return;
-    setCallTargetUserId(targetId ?? target);
-    setShowCallTargetPicker(false);
-    setCallWithVideo(withVideo);
-    setCallState('calling');
+  const handleRemoveMember = async (convId, memberId) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo ? { facingMode: 'user' } : false });
-      localStreamRef.current = stream;
-      setHasLocalStream(true);
-      const pc = createPeerConnection(target);
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-      peerConnectionRef.current = pc;
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit('start_call', { conversationId: conversation.id, toUserId: conversation?.type === 'group' ? target : undefined });
-      socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: target, signal: { type: 'offer', sdp: offer.sdp } });
-    } catch (err) {
-      setCallState('idle');
-    }
+      await api.removeMemberFromGroup(convId, memberId);
+      const updated = await api.getConversation(convId);
+      setConvDetails(updated);
+      onMembersUpdated?.();
+    } catch (_) {}
   };
-
-  const acceptCall = async (withVideo = true) => {
-    const offer = pendingOfferRef.current;
-    const target = incomingCallFrom?.userId ?? otherUserId;
-    if (!socket || !conversation?.id || !target || !offer) return;
-    setCallWithVideo(withVideo);
-    setIncomingCallFrom(null);
-    setCallState('connected');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: withVideo ? { facingMode: 'user' } : false });
-      localStreamRef.current = stream;
-      setHasLocalStream(true);
-      const pc = createPeerConnection(target);
-      peerConnectionRef.current = pc;
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-      await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offer.sdp }));
-      pendingOfferRef.current = null;
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: target, signal: { type: 'answer', sdp: answer.sdp } });
-    } catch (err) {
-      setCallState('idle');
-    }
-  };
-
-  const rejectCall = () => {
-    if (socket && conversation?.id && incomingCallFrom?.userId) {
-      socket.emit('reject_call', { conversationId: conversation.id, callerUserId: incomingCallFrom.userId });
-    }
-    setCallState('idle');
-    setIncomingCallFrom(null);
-  };
-
-  const startGroupCall = async () => {
-    if (!socket || !conversation?.id || conversation?.type !== 'group') return;
-    setShowCallTargetPicker(false);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      localStreamRef.current = stream;
-      setHasLocalStream(true);
-      setCallWithVideo(true);
-      setCallState('group_call');
-      groupCallHostRef.current = true;
-      socket.emit('start_group_call', { conversationId: conversation.id });
-    } catch (err) {
-      setCallState('idle');
-    }
-  };
-
-  const joinGroupCall = async () => {
-    if (!socket || !conversation?.id || !groupCallActive) return;
-    const target = groupCallActive.initiatorId || groupCallParticipants.find((id) => id !== currentUserId);
-    if (!target || target === currentUserId) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      localStreamRef.current = stream;
-      setHasLocalStream(true);
-      setCallWithVideo(true);
-      setCallState('group_call');
-      setGroupCallParticipants((p) => (p.includes(currentUserId) ? p : [...p, currentUserId]));
-      socket.emit('join_group_call', { conversationId: conversation.id });
-      if (target) {
-        setCallTargetUserId(target);
-        const pc = createPeerConnection(target);
-        peerConnectionRef.current = pc;
-        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit('webrtc_signal', { conversationId: conversation.id, toUserId: target, signal: { type: 'offer', sdp: offer.sdp } });
-      }
-    } catch (err) {
-      setCallState('idle');
-    }
-  };
-
-  const leaveGroupCall = () => {
-    groupCallHostRef.current = false;
-    if (socket && conversation?.id) socket.emit('leave_group_call', { conversationId: conversation.id });
-    hangupCall();
-    setGroupCallActive(null);
-    setGroupCallParticipants([]);
-  };
-
-  const hangupCall = () => {
-    setCallTargetUserId(null);
-    if (socket && conversation?.id) socket.emit('hangup_call', { conversationId: conversation.id });
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
-      localStreamRef.current = null;
-    }
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    setHasLocalStream(false);
-    setCallState('idle');
-    setIncomingCallFrom(null);
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (showEmojiPicker && emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) setShowEmojiPicker(false);
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [showEmojiPicker]);
-
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape' && lightboxImage) setLightboxImage(null);
-    };
-    document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [lightboxImage]);
 
   if (!conversation) return null;
+  const isGroup = convDetails?.type === 'group';
+  const otherUserId = !isGroup && convDetails?.members ? convDetails.members.find((m) => Number(m) !== Number(currentUserId)) : null;
+  const theme = typeof document !== 'undefined' && document.documentElement?.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
 
   return (
-    <div className="chat-room-inner" style={s.room}>
-      <div className="chat-header-bar" style={s.header}>
-        <button type="button" style={s.backBtn} onClick={onBack}>← رجوع</button>
-        <span
-          style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0, cursor: conversation?.type === 'group' ? 'pointer' : 'default' }}
-          onClick={conversation?.type === 'group' ? () => setShowGroupInfo(true) : undefined}
-        >
-          {conversation.label || conversation.name || 'محادثة'}
+    <div className="chat-room-inner" style={styles.room}>
+      <div className="chat-header-bar" style={styles.header}>
+        <button type="button" style={styles.backBtn} onClick={onBack}>← رجوع</button>
+        <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+          {convDetails?.label || convDetails?.name || 'محادثة'}
         </span>
-        {conversation?.type === 'group' && (
-          <button type="button" style={s.voiceBtn} onClick={() => setShowGroupMenu(true)} title="خيارات المجموعة">⋮</button>
+        {!isGroup && otherUserId && (convDetails?.memberDetails || []).find((m) => Number(m.id) === Number(otherUserId))?.last_seen_at && (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>آخر ظهور: {new Date((convDetails?.memberDetails || []).find((m) => Number(m.id) === Number(otherUserId))?.last_seen_at).toLocaleString('ar-EG')}</span>
         )}
-        {(isDirectTwo || isGroupCallable) && callState === 'idle' && (
+        {!isGroup && otherUserId && (
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            {e2eReady && <span style={{ fontSize: 10, color: 'var(--text-muted)' }} title="تشفير من طرف لطرف">🔒</span>}
+            <button type="button" onClick={() => startCall(true)} title="مكالمة صوتية" style={{ ...styles.backBtn, padding: '6px 10px', fontSize: 16 }}>📞</button>
+            <button type="button" onClick={() => startCall(false)} title="مكالمة فيديو" style={{ ...styles.backBtn, padding: '6px 10px', fontSize: 16 }}>📹</button>
+          </div>
+        )}
+        {isGroup && (
           <>
-            {isDirectTwo && isAdmin && onBlockUser && otherUserId && (
-              <button type="button" style={{ ...s.voiceBtn, background: 'rgba(248,81,73,0.2)', color: '#f85149' }} onClick={() => onBlockUser(otherUserId)} title="إيقاف وصوله">⏹</button>
-            )}
-            {isDirectTwo && (
-              <>
-                <button type="button" style={s.voiceBtn} onClick={() => startCall(false)} title="مكالمة صوتية">📞</button>
-                <button type="button" style={s.voiceBtn} onClick={() => startCall(true)} title="مكالمة فيديو">📹</button>
-              </>
-            )}
-            {isGroupCallable && (
-              <>
-                <button type="button" style={s.voiceBtn} onClick={() => setShowCallTargetPicker(true)} title="مكالمة مع عضو">📞</button>
-                <button type="button" style={s.voiceBtn} onClick={() => setShowCallTargetPicker(true)} title="مكالمة فيديو مع عضو">📹</button>
-                <button type="button" style={{ ...s.voiceBtn, background: 'var(--primary)' }} onClick={startGroupCall} title="بدء مكالمة مجموعة">📹 مجموعة</button>
-              </>
-            )}
+            <button type="button" onClick={() => { socket?.emit('start_group_call', { conversationId: conversation.id }); }} style={{ ...styles.backBtn, padding: '6px 10px', fontSize: 13 }}>📞 مكالمة</button>
+            <button type="button" onClick={() => setShowGroupInfo(true)} style={{ ...styles.backBtn, padding: '6px 10px', fontSize: 13 }}>ℹ️ المجموعة</button>
           </>
         )}
-        {callState === 'calling' && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>جاري الاتصال...</span>}
       </div>
-      {showGroupInfo && conversation?.type === 'group' && (
-        <GroupInfo
-          conversation={conversation}
-          currentUserId={currentUserId}
-          onClose={() => setShowGroupInfo(false)}
-          onMembersUpdated={(updated) => { if (updated) onConversationUpdate?.(updated); setShowGroupInfo(false); }}
-          onRemoveMember={onRemoveMember}
-        />
-      )}
-      {showGroupMenu && conversation?.type === 'group' && (
-        <div style={s.callModal} onClick={() => setShowGroupMenu(false)}>
-          <div style={{ ...s.callModalBox, textAlign: 'right', minWidth: 280 }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px' }}>خيارات المجموعة</h3>
-            <button type="button" style={{ display: 'block', width: '100%', padding: '12px 16px', marginBottom: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }} onClick={() => { setShowGroupMenu(false); setShowGroupInfo(true); }}>معلومات المجموعة وإضافة عضو</button>
-            {Number(conversation?.created_by) === Number(currentUserId) && (
-              <>
-                <button type="button" style={{ display: 'block', width: '100%', padding: '12px 16px', marginBottom: 8, background: 'rgba(248,81,73,0.15)', border: '1px solid #f85149', borderRadius: 8, color: '#f85149', cursor: 'pointer', fontSize: 14, textAlign: 'right' }} onClick={() => { onDeleteGroup?.(conversation.id); setShowGroupMenu(false); }}>حذف المجموعة</button>
-                <p style={{ fontSize: 12, color: '#4a5568', marginBottom: 8 }}>طرد عضو:</p>
-                {groupMembers.map((m) => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                    <span>{m.name} (معرف: {m.id})</span>
-                    <button type="button" style={{ padding: '6px 12px', background: 'rgba(248,81,73,0.2)', border: 'none', borderRadius: 6, color: '#f85149', cursor: 'pointer', fontSize: 12 }} onClick={() => { onRemoveMember?.(conversation.id, m.id); setShowGroupMenu(false); }}>طرد</button>
-                  </div>
-                ))}
-                <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }} />
-              </>
-            )}
-            <button type="button" style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }} onClick={() => { onLeaveGroup?.(conversation.id); setShowGroupMenu(false); }}>مغادرة المجموعة</button>
-            <button type="button" onClick={() => setShowGroupMenu(false)} style={{ marginTop: 12, ...s.backBtn }}>إغلاق</button>
-          </div>
-        </div>
-      )}
-      {groupCallActive && !groupCallParticipants.includes(currentUserId) && callState === 'idle' && (
-        <div style={{ padding: 12, background: 'rgba(35,134,54,0.2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span style={{ fontSize: 14 }}>مكالمة مجموعة جارية من {groupCallActive.initiatorName} — انضم براحتك</span>
-          <button type="button" style={s.sendBtn} onClick={joinGroupCall}>انضم للمكالمة</button>
-        </div>
-      )}
-      {showCallTargetPicker && isGroupCallable && (
-        <div style={s.callModal} onClick={() => setShowCallTargetPicker(false)}>
-          <div style={s.callModalBox} onClick={(e) => e.stopPropagation()}>
-            <p style={{ margin: '0 0 16px' }}>اختر العضو للمكالمة</p>
-            {groupMembers.map((m) => (
-              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                {m.avatar_url ? <img src={api.uploadsUrl(m.avatar_url)} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</span>}
-                <span style={{ flex: 1 }}>{m.name} (معرف: {m.id})</span>
-                <button type="button" style={{ ...s.voiceBtn, fontSize: 12 }} onClick={() => startCall(false, m.id)}>📞 صوت</button>
-                <button type="button" style={s.voiceBtn} onClick={() => startCall(true, m.id)}>📹 فيديو</button>
-              </div>
-            ))}
-            <button type="button" onClick={() => setShowCallTargetPicker(false)} style={{ marginTop: 12, ...s.backBtn }}>إلغاء</button>
-          </div>
-        </div>
-      )}
-      {callState === 'incoming' && incomingCallFrom && (
-        <div style={s.callModal}>
-          <div style={s.callModalBox}>
-            <p style={{ margin: '0 0 16px' }}>{incomingCallFrom.userName} يتصل بك</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center' }}>
-              <button type="button" style={{ ...s.sendBtn, background: '#238636' }} onClick={() => acceptCall(true)}>قبول (فيديو)</button>
-              <button type="button" style={{ ...s.sendBtn, background: '#2ea043' }} onClick={() => acceptCall(false)}>قبول (صوت)</button>
-              <button type="button" style={{ ...s.backBtn, padding: '10px 20px' }} onClick={rejectCall}>رفض</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {(callState === 'calling' || callState === 'connected' || callState === 'group_call') && (
-        <div style={s.callVideoWrap}>
-          <video ref={remoteVideoRef} style={s.remoteVideo} autoPlay playsInline muted={false} />
-          <video ref={localVideoRef} style={s.localVideo} autoPlay playsInline muted />
-          <span style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', color: '#fff', fontSize: 14 }}>
-            {callState === 'connected' ? (callWithVideo ? 'مكالمة فيديو' : 'مكالمة صوتية') : 'جاري الاتصال...'}
-          </span>
-          <button type="button" style={s.hangupBtn} onClick={callState === 'group_call' || groupCallParticipants.length > 0 ? leaveGroupCall : hangupCall}>إنهاء المكالمة</button>
-        </div>
-      )}
-      {(callState === 'calling' || callState === 'connected' || callState === 'group_call') && <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />}
-      {lightboxImage && (
-        <div
-          onClick={() => setLightboxImage(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.9)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-            padding: 16
-          }}
-        >
-          <img
-            src={lightboxImage}
-            alt=""
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            onClick={() => setLightboxImage(null)}
-            style={{
-              position: 'absolute',
-              top: 16,
-              right: 16,
-              padding: '10px 20px',
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              color: 'var(--text)',
-              cursor: 'pointer',
-              fontSize: 16
-            }}
-          >
-            ✕ إغلاق
-          </button>
-        </div>
-      )}
-      <div style={s.searchRow}>
-        <input type="text" placeholder="بحث في الرسائل..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={s.searchInput} />
-        {searchQuery.trim() && <button type="button" style={s.copyBtn} onClick={() => setSearchQuery('')}>إلغاء</button>}
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+        <input type="text" placeholder="بحث في الرسائل..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', fontSize: 14, textAlign: 'right' }} />
       </div>
-      <div className="chat-msg-area" style={s.messages}>
+      <div className="chat-msg-area" style={styles.messages}>
         {loading && <p style={{ color: 'var(--text-muted)' }}>جاري التحميل...</p>}
-        {!loading && messages.length > 0 && (
-          <button type="button" style={s.loadMoreBtn} onClick={loadMoreMessages} disabled={loadingMore}>
-            {loadingMore ? 'جاري التحميل...' : 'تحميل رسائل أقدم'}
-          </button>
-        )}
-        {filteredMessages.map((m) => {
+        {displayMessages.map((m) => {
           const isOwn = Number(m.sender_id) === Number(currentUserId);
-          const isDeleted = !!m.deleted;
-          const replySnippet = m.reply_to_snippet || (m.reply_to_id ? getReplySnippet(displayMessages.find((x) => x.id === m.reply_to_id)) : '') || 'رسالة';
-          const canCopy = !isDeleted && (m.type === 'text' || m.type === 'location') && (m.content || '').trim();
-          const handleDelete = (forEveryone) => {
-            if (!socket || !conversation?.id) return;
-            socket.emit('delete_message', { conversationId: conversation.id, messageId: m.id, forEveryone });
-          };
-          const others = (conversation.memberIds || []).filter((id) => Number(id) !== Number(currentUserId));
-          const isRead = isOwn && others.length > 0 && typeof m.id === 'number' && others.every((uid) => (readReceipts[uid] || 0) >= m.id);
           return (
-            <div key={m.id} style={{ ...s.msg, ...(isOwn ? s.msgOwn : s.msgOther) }}>
-              {!isOwn && m.sender && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  {m.sender.avatar_url ? <img src={api.uploadsUrl(m.sender.avatar_url)} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : null}
-                  <span style={{ fontSize: 12, opacity: 0.9 }}>{m.sender.name || m.sender.email || m.sender.phone}</span>
-                  <span style={{ fontSize: 10, opacity: 0.7 }}>(معرف: {m.sender.id})</span>
+            <div key={m.id} data-msg-id={m.id} style={{ ...styles.msg, ...(isOwn ? styles.msgOwn : styles.msgOther) }}>
+              {!isOwn && m.sender && <div style={{ fontSize: 12, opacity: 0.9, color: 'var(--msg-sender-color, var(--text))' }}>{m.sender.name || m.sender.email || m.sender.phone} <span style={{ fontSize: 10, opacity: 0.8 }}>(معرف: {m.sender.id})</span></div>}
+              {m.reply_to_id && (
+                <div style={{ borderRight: '3px solid var(--primary)', paddingRight: 8, marginBottom: 6, opacity: 0.9, fontSize: 12 }}>
+                  {m.reply_to_snippet || 'رسالة'}
                 </div>
               )}
-              {(m.reply_to_id || m.reply_to_snippet) && !isDeleted && (
-                <div style={{ ...s.replyBar, color: isOwn ? 'rgba(255,255,255,0.9)' : undefined }}>رد على: {replySnippet}</div>
-              )}
-              {isDeleted ? (
-                <div style={{ fontStyle: 'italic', opacity: 0.8 }}>تم حذف هذه الرسالة</div>
-              ) : (
-                <>
-                  {m.type === 'text' && <div>{m.content}</div>}
-                  {m.type === 'image' && (
-                    <img
-                      src={m.content}
-                      alt=""
-                      style={{ ...s.img, cursor: 'pointer' }}
-                      onClick={() => setLightboxImage(m.content)}
-                    />
-                  )}
-                  {m.type === 'file' && <a href={m.content} target="_blank" rel="noopener noreferrer" style={s.link}>{m.file_name || 'ملف'}</a>}
-                  {m.type === 'voice' && <audio controls src={m.content} style={s.audio} />}
-                  {m.type === 'location' && (
-                    <a href={m.content} target="_blank" rel="noopener noreferrer" style={s.link}>📍 عرض الموقع على الخريطة</a>
-                  )}
-                </>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                <div style={{ ...s.msgMeta, ...(isOwn ? s.msgMetaOwn : s.msgMetaOther) }}>{new Date(m.created_at).toLocaleString('ar-EG')}</div>
-                {isRead && <span style={{ fontSize: 11, opacity: 0.9 }} title="تمت المشاهدة">✓✓</span>}
-                {canCopy && (
-                  <button type="button" style={{ ...s.copyBtn, ...(isOwn ? s.copyBtnOwn : s.copyBtnOther) }} onClick={() => copyMessageText(m)} title="نسخ">
-                    {copyDoneId === m.id ? 'تم النسخ' : 'نسخ'}
-                  </button>
-                )}
-                {!isDeleted && <button type="button" style={{ ...s.replyBtn, ...(isOwn ? s.replyBtnOwn : s.replyBtnOther) }} onClick={() => setReplyTo({ id: m.id, snippet: getReplySnippet(m) || 'رسالة' })} title="رد">↩ رد</button>}
-                {!isDeleted && isOwn && socket && (
-                  <>
-                    <button type="button" style={{ ...s.deleteBtn, ...s.deleteBtnOwn }} onClick={() => handleDelete(false)} title="حذف لي">حذف لي</button>
-                    <button type="button" style={{ ...s.deleteBtn, ...s.deleteBtnOwn }} onClick={() => handleDelete(true)} title="حذف للجميع">حذف للجميع</button>
-                  </>
-                )}
+              {m.type === 'text' && <div style={{ whiteSpace: 'pre-wrap' }}>{m.deleted ? 'رسالة محذوفة' : (m.encrypted ? (decryptedMap[m.id] ?? '...') : m.content)}</div>}
+              {m.type === 'image' && !m.deleted && <img src={m.content} alt="" style={styles.img} />}
+              {m.type === 'video' && !m.deleted && <video src={m.content} controls playsInline style={{ marginTop: 4, maxWidth: '100%', maxHeight: 300, borderRadius: 8 }} />}
+              {m.type === 'voice' && !m.deleted && <audio src={m.content} controls style={{ marginTop: 4, maxWidth: '100%' }} />}
+              {m.type === 'location' && !m.deleted && (() => { const parts = String(m.content || '').split('\n'); const label = parts[0] || '📍 الموقع'; const url = (parts[1] || '').startsWith('http') ? parts[1] : `https://www.google.com/maps?q=${encodeURIComponent(m.content)}`; return <div><a href={url} target="_blank" rel="noopener noreferrer" style={styles.link}>{label}</a></div>; })()}
+              {m.type === 'file' && !m.deleted && <a href={m.content} target="_blank" rel="noopener noreferrer" style={styles.link}>{m.file_name || 'ملف'}</a>}
+              {m.type === 'poll' && !m.deleted && (() => {
+                let poll;
+                try { poll = typeof m.content === 'string' ? JSON.parse(m.content) : m.content; } catch (_) { return null; }
+                const opts = poll?.options || [];
+                const votesForMsg = pollVotes.filter((v) => Number(v.message_id) === Number(m.id));
+                const counts = opts.map((_, i) => votesForMsg.filter((v) => v.option_index === i).length);
+                const total = counts.reduce((a, b) => a + b, 0);
+                const myVote = votesForMsg.find((v) => Number(v.user_id) === Number(currentUserId));
+                return (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ fontWeight: 500, marginBottom: 8 }}>{poll.question || 'استطلاع'}</div>
+                    {opts.map((opt, i) => (
+                      <button key={i} type="button" onClick={async () => { if (myVote) return; try { await api.votePoll(conversation.id, m.id, i); setPollVotes((p) => [...p.filter((v) => !(v.message_id === m.id && v.user_id === currentUserId)), { message_id: m.id, user_id: currentUserId, option_index: i }]); } catch (_) {} }} style={{ display: 'block', width: '100%', padding: '8px 12px', marginBottom: 4, border: '1px solid var(--border)', borderRadius: 8, background: myVote?.option_index === i ? 'rgba(var(--primary-rgb,0,123,255),0.2)' : 'var(--bg)', color: 'var(--text)', cursor: myVote ? 'default' : 'pointer', textAlign: 'right' }}>
+                        {opt} {total > 0 && <span style={{ fontSize: 11, opacity: 0.8 }}>({counts[i]})</span>}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ ...styles.msgMeta, color: 'var(--msg-meta-color, inherit)', marginTop: 0 }}>{new Date(m.created_at).toLocaleString('ar-EG')}</div>
+                  {isOwn && !m.deleted && !String(m.id).startsWith('temp-') && !isGroup && otherUserId && (() => {
+                    const rr = readReceipts.find((r) => Number(r.user_id) === Number(otherUserId));
+                    const readUpTo = rr?.last_message_id != null ? Number(rr.last_message_id) : -1;
+                    const msgId = typeof m.id === 'number' ? m.id : parseInt(m.id, 10);
+                    if (isNaN(msgId)) return null;
+                    const isRead = readUpTo >= msgId;
+                    return isRead ? <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }} title="تمت القراءة">✓✓</span> : <span style={{ fontSize: 11, opacity: 0.7 }} title="مرسلة">✓</span>;
+                  })()}
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" onClick={() => setReplyTo(m)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>↩ رد</button>
+                  <button type="button" onClick={() => setMsgMenuId(msgMenuId === m.id ? null : m.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>⋮</button>
+                </div>
               </div>
+              {(reactions[m.id] || []).length > 0 && (
+                <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                  {(reactions[m.id] || []).map((r) => (
+                    <span key={r.user_id} style={{ fontSize: 14 }} title={`معرف ${r.user_id}`}>{r.emoji}</span>
+                  ))}
+                </div>
+              )}
+              {msgMenuId === m.id && (
+                <div style={{ marginTop: 6, padding: 4, background: 'var(--bg)', borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {m.type === 'text' && !m.deleted && (
+                    <button type="button" onClick={() => { const txt = m.encrypted ? (decryptedMap[m.id] || '') : (m.content || ''); if (txt) navigator.clipboard?.writeText(txt); setMsgMenuId(null); }} style={{ padding: '6px 10px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'right' }}>📋 نسخ النص</button>
+                  )}
+                  {!m.deleted && !m.encrypted && (
+                    <button type="button" onClick={() => { setShowForward(m); setMsgMenuId(null); }} style={{ padding: '6px 10px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'right' }}>↪ إعادة توجيه</button>
+                  )}
+                  {['❤️', '👍', '😂', '😮', '👎'].map((emo) => {
+                    const myReaction = (reactions[m.id] || []).find((r) => Number(r.user_id) === Number(currentUserId) && r.emoji === emo);
+                    return (
+                      <button key={emo} type="button" onClick={() => {
+                        if (myReaction) socket?.emit('remove_reaction', { conversationId: conversation.id, messageId: m.id });
+                        else socket?.emit('add_reaction', { conversationId: conversation.id, messageId: m.id, emoji: emo });
+                        setMsgMenuId(null);
+                      }} style={{ padding: '6px 10px', border: 'none', background: myReaction ? 'rgba(var(--primary-rgb, 0,123,255),0.2)' : 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, borderRadius: 6 }}>{emo}</button>
+                    );
+                  })}
+                  <button type="button" onClick={() => handleDeleteMsg(m, false)} style={{ padding: '6px 10px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, textAlign: 'right' }}>حذف عندي</button>
+                  {Number(m.sender_id) === Number(currentUserId) && (
+                    <button type="button" onClick={() => handleDeleteMsg(m, true)} style={{ padding: '6px 10px', border: 'none', background: 'none', color: '#f85149', cursor: 'pointer', fontSize: 12, textAlign: 'right' }}>حذف للجميع</button>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
+        {typingUser && <div style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'flex-start', marginTop: 4 }}>…{typingUser.name} يكتب</div>}
+        {groupCallParticipants && groupCallParticipants.length > 0 && (
+          <div style={{ padding: 10, background: 'var(--surface)', borderRadius: 8, marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 13 }}>📞 مكالمة جماعية ({groupCallParticipants.length} مشارك)</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {!groupCallParticipants.some((id) => Number(id) === Number(currentUserId)) && (
+                <button type="button" onClick={() => socket?.emit('join_group_call', { conversationId: conversation.id })} style={{ padding: '6px 12px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 12 }}>انضم</button>
+              )}
+              {groupCallParticipants.some((id) => Number(id) === Number(currentUserId)) && (
+                <button type="button" onClick={() => { socket?.emit('leave_group_call', { conversationId: conversation.id }); setGroupCallParticipants(null); }} style={{ padding: '6px 12px', background: '#f85149', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 12 }}>غادر</button>
+              )}
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
-      {typingUser && <div style={s.typingBar}>{typingUser} يكتب...</div>}
-      {(fileError || voiceError || locationError) && <p style={{ padding: 8, margin: 0, fontSize: 13, color: '#f85149', background: 'rgba(248,81,73,0.1)' }}>{fileError || voiceError || locationError}</p>}
+      {fileError && <p style={{ padding: 8, margin: 0, fontSize: 13, color: '#f85149', background: 'rgba(248,81,73,0.1)' }}>{fileError}</p>}
       {replyTo && (
-        <div style={s.replyPreview}>
-          <span>رد على: {replyTo.snippet}</span>
-          <button type="button" style={s.replyBtn} onClick={() => setReplyTo(null)}>إلغاء</button>
+        <div style={{ padding: 8, background: 'var(--bg)', borderRight: '3px solid var(--primary)', margin: '0 12px 8px', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>↩ {getMsgSnippet(replyTo)}</span>
+          <button type="button" onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18 }}>×</button>
         </div>
       )}
       <form
         className="chat-form-row"
-        style={s.form}
-        onSubmit={(e) => {
-          e.preventDefault();
-          const trimmed = text.trim();
-          if (trimmed) sendMessage('text', trimmed, null, replyTo?.id || null, replyTo?.snippet || null);
-        }}
+        style={styles.form}
+        onSubmit={(e) => { e.preventDefault(); sendMessage('text', text.trim(), null, replyTo); }}
       >
-        <input type="file" ref={fileInputRef} onChange={handleFile} accept="image/*,*" style={{ display: 'none' }} />
-        <button type="button" style={s.locationBtn} onClick={shareLocation} title="مشاركة الموقع">📍</button>
-        {!isRecording ? (
-          <button type="button" style={s.voiceBtn} onClick={startVoiceRecording} title="رسالة صوتية">🎤</button>
-        ) : (
-          <button type="button" style={{ ...s.voiceBtn, background: '#f85149', color: '#fff' }} onClick={stopVoiceRecording} title="إيقاف وإرسال">⏹ إيقاف</button>
-        )}
-        <div ref={emojiPickerRef} style={{ position: 'relative' }}>
-          <button type="button" style={s.emojiBtn} onClick={() => setShowEmojiPicker((v) => !v)} title="إيموجي">😀</button>
-          {showEmojiPicker && (
-            <div style={{ position: 'fixed', bottom: 70, left: '50%', transform: 'translateX(-50%)', zIndex: 20, maxWidth: 'min(320px, calc(100vw - 24px))' }}>
-              <EmojiPicker onEmojiClick={(e) => { setText((t) => t + (e.emoji || '')); setShowEmojiPicker(false); }} theme="dark" width={320} height={360} />
-            </div>
+        <input type="file" ref={fileInputRef} onChange={(e) => handleFile(e, false)} accept="*" style={{ display: 'none' }} />
+        <input type="file" ref={imageInputRef} onChange={(e) => handleFile(e, false)} accept="image/*" style={{ display: 'none' }} />
+        <input type="file" ref={videoInputRef} onChange={(e) => handleFile(e, false)} accept="video/*" style={{ display: 'none' }} />
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button type="button" style={styles.fileBtn} onClick={() => fileInputRef.current?.click()} title="ملف">📎</button>
+          <button type="button" style={styles.fileBtn} onClick={() => imageInputRef.current?.click()} title="صورة">📷</button>
+          <button type="button" style={styles.fileBtn} onClick={() => videoInputRef.current?.click()} title="فيديو">🎬</button>
+          <button type="button" style={styles.fileBtn} onClick={() => setShowGifPicker(true)} title="GIF">🎞️</button>
+          {isGroup && <button type="button" style={styles.fileBtn} onClick={() => setShowPollCreate(true)} title="استطلاع">📊</button>}
+          <button type="button" style={styles.fileBtn} onClick={handleLocation} title="الموقع">📍</button>
+          {!isRecording ? (
+            <button type="button" style={styles.fileBtn} onMouseDown={startRecording} onMouseUp={stopRecording} onMouseLeave={stopRecording} onTouchStart={(e) => { e.preventDefault(); startRecording(); }} onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }} title="رسالة صوتية (اضغط مع الاستمرار)">🎤</button>
+          ) : (
+            <button type="button" style={{ ...styles.fileBtn, background: 'var(--primary)', color: '#fff' }} onMouseUp={stopRecording} onMouseLeave={stopRecording} onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}>⏹ التوقف</button>
           )}
+          <div ref={emojiWrapRef} style={{ position: 'relative' }}>
+            <button type="button" style={styles.fileBtn} onClick={() => setShowEmoji((v) => !v)} title="إيموجي">😊</button>
+            {showEmoji && (
+              <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, zIndex: 20 }}>
+                <EmojiPicker theme={theme} onEmojiClick={(e) => { setText((t) => t + (e.emoji || '')); }} width={320} height={360} />
+              </div>
+            )}
+          </div>
         </div>
-        <button type="button" style={s.fileBtn} onClick={() => fileInputRef.current?.click()}>📎</button>
-        <input
-          type="text"
-          placeholder="اكتب رسالة..."
-          value={text}
-          onChange={(e) => { setText(e.target.value); emitTyping(); }}
-          style={s.input}
-        />
-        <button type="submit" style={s.sendBtn}>إرسال</button>
+        <input type="text" placeholder="اكتب رسالة..." value={text} onChange={(e) => { setText(e.target.value); emitTyping(); }} onBlur={() => { if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); socket?.emit('stop_typing', { conversationId: conversation.id }); } }} style={styles.input} />
+        <button type="submit" style={styles.sendBtn}>إرسال</button>
       </form>
+      {showGifPicker && <GifPicker onSelect={(url) => sendMessage('image', url, 'GIF')} onClose={() => setShowGifPicker(false)} />}
+      {showForward && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 150 }} onClick={() => setShowForward(null)}>
+          <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 360, width: '100%', maxHeight: '80vh', overflow: 'auto', border: '1px solid var(--border)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 12px' }}>إعادة التوجيه إلى</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {(conversations || []).filter((c) => c.id !== conversation?.id).length === 0 ? (
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>لا توجد محادثات أخرى للإعادة التوجيه إليها</p>
+              ) : (
+                (conversations || []).filter((c) => c.id !== conversation?.id).map((c) => (
+                  <button key={c.id} type="button" onClick={async () => { try { await api.forwardMessage(c.id, conversation.id, showForward.id); setShowForward(null); } catch (err) { setFileError(err.message || 'فشل'); } }} style={{ padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>{c.label || 'محادثة'}</button>
+                ))
+              )}
+            </div>
+            <button type="button" onClick={() => setShowForward(null)} style={{ marginTop: 12, padding: '8px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إلغاء</button>
+          </div>
+        </div>
+      )}
+      {showPollCreate && isGroup && (
+        <PollCreateModal onClose={() => setShowPollCreate(false)} onSent={(content) => { sendMessage('poll', content); setShowPollCreate(false); }} />
+      )}
+      {showGroupInfo && isGroup && (
+        <GroupInfo conversation={convDetails} currentUserId={currentUserId} onClose={() => setShowGroupInfo(false)} onMembersUpdated={async () => { const updated = await api.getConversation(conversation.id); setConvDetails(updated); onMembersUpdated?.(); }} onRemoveMember={handleRemoveMember} disappearingAfter={convDetails?.disappearing_after} onDisappearingChange={async (sec) => { await api.setDisappearing(conversation.id, sec); const updated = await api.getConversation(conversation.id); setConvDetails(updated); onMembersUpdated?.(); }} />
+      )}
+      {callState && !webrtcCall && <CallModal isVoice={callState.isVoice} callerName="جاري الاتصال..." isOutgoing onHangup={() => { stopCallRing(); socket?.emit('hangup_call', { conversationId: conversation.id }); setCallState(null); }} />}
+      {webrtcCall && (
+        <WebRTCCall
+          socket={socket}
+          conversationId={conversation.id}
+          remoteUserId={webrtcCall.remoteUserId}
+          isInitiator
+          isVideo={webrtcCall.isVideo}
+          onEnd={() => { socket?.emit('hangup_call', { conversationId: conversation.id }); setWebrtcCall(null); setCallState(null); }}
+        />
+      )}
     </div>
   );
 }

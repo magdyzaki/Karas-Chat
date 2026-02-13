@@ -14,6 +14,10 @@
   --msg-text-own: #ffffff;
   --msg-meta-own: rgba(255,255,255,0.82);
   --msg-bg-other: #1c2128;
+  --msg-text-other: #e6edf3;
+  --msg-sender-color: #58a6ff;
+  --msg-meta-color: #8b949e;
+  --list-name-color: #e6edf3;
   --menu-bg: #161b22;
   --msg-action-color: #4a5568;
 }
@@ -32,14 +36,24 @@
   --msg-text-own: #ffffff;
   --msg-meta-own: rgba(255,255,255,0.78);
   --msg-bg-other: #e4e6eb;
+  --msg-text-other: #050505;
+  --msg-sender-color: #1877f2;
+  --msg-meta-color: #65676b;
+  --list-name-color: #050505;
   --menu-bg: #ffffff;
   --msg-action-color: #374151;
 }
 [data-font-size="small"] { font-size: 14px; }
 [data-font-size="large"] { font-size: 18px; }
+[data-font="tajawal"] { font-family: 'Tajawal', system-ui, sans-serif; }
+[data-font="cairo"] { font-family: 'Cairo', system-ui, sans-serif; }
+[data-font="amiri"] { font-family: 'Amiri', 'Traditional Arabic', serif; }
+[data-font="system"] { font-family: system-ui, -apple-system, sans-serif; }
 body[data-chat-bg="dots"] .chat-msg-area { background-image: radial-gradient(circle, var(--border-light) 1px, transparent 1px); background-size: 18px 18px; }
 body[data-chat-bg="lines"] .chat-msg-area { background-image: repeating-linear-gradient(0deg, transparent, transparent 40px, var(--border-light) 40px, var(--border-light) 41px); }
 body[data-chat-bg="grid"] .chat-msg-area { background-image: linear-gradient(var(--border-light) 1px, transparent 1px), linear-gradient(90deg, var(--border-light) 1px, transparent 1px); background-size: 20px 20px; }
+body[data-chat-bg="waves"] .chat-msg-area { background-image: repeating-linear-gradient(45deg, transparent, transparent 35px, var(--border-light) 35px, var(--border-light) 36px); background-size: 50px 50px; }
+body[data-chat-bg="image"] .chat-msg-area { background-image: linear-gradient(rgba(0,0,0,0.12), rgba(0,0,0,0.12)), var(--chat-wallpaper-image); background-size: cover; background-position: center; }
 html { overflow-x: hidden; }
 body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--chat-wallpaper, var(--bg)); color: var(--text); min-height: 100vh; overflow-x: hidden; }
 input, textarea, button { font-family: inherit; }

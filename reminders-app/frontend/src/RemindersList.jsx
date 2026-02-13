@@ -139,12 +139,13 @@ export default function RemindersList({ user, reminders, error, isAdmin, onLogou
       <header style={styles.header}>
         <h1 style={styles.title}>Karas — تنبيهات</h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* أزرار الأدمن — تظهر للجميع، والباكند يرفض غير المسؤولين */}
-          <>
-            <button type="button" style={{ ...styles.btn, background: 'var(--primary)', color: '#fff' }} onClick={handleCreateInvite} disabled={inviteLoading} title="رابط للآيفون والأندرويد">{inviteLoading ? '...' : '📱 رابط دعوة (آيفون/أندرويد)'}</button>
-            <button type="button" style={styles.btn} onClick={() => { setBlockedModal(true); loadBlocked(); }}>الموقوفون</button>
-            <button type="button" style={{ ...styles.btn, background: 'rgba(248,81,73,0.2)', color: '#f85149' }} onClick={() => { setBlockUserModal(true); loadAllUsers(); loadBlocked(); }}>إيقاف مستخدم</button>
-          </>
+          {isAdmin && (
+            <>
+              <button type="button" style={{ ...styles.btn, background: 'var(--primary)', color: '#fff' }} onClick={handleCreateInvite} disabled={inviteLoading} title="رابط للآيفون والأندرويد">{inviteLoading ? '...' : '📱 رابط دعوة (آيفون/أندرويد)'}</button>
+              <button type="button" style={styles.btn} onClick={() => { setBlockedModal(true); loadBlocked(); }}>الموقوفون</button>
+              <button type="button" style={{ ...styles.btn, background: 'rgba(248,81,73,0.2)', color: '#f85149' }} onClick={() => { setBlockUserModal(true); loadAllUsers(); loadBlocked(); }}>إيقاف مستخدم</button>
+            </>
+          )}
           <button type="button" style={styles.btn} onClick={onRefresh}>تحديث</button>
           <button type="button" style={styles.btn} onClick={onLogout}>خروج</button>
         </div>

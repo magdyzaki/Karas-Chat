@@ -1,95 +1,57 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import * as api from './api';
 import Auth from './Auth';
 import ChatList from './ChatList';
 import ChatRoom from './ChatRoom';
-import InvitePage from './InvitePage';
+import BroadcastCompose from './BroadcastCompose';
+import Stories from './Stories';
+import StoryCreate from './StoryCreate';
 import Settings from './Settings';
+import InvitePage from './InvitePage';
+import InviteLinkModal from './InviteLinkModal';
+import BlockUserModal from './BlockUserModal';
+import PendingCodesModal from './PendingCodesModal';
+import CallModal from './CallModal';
+import WebRTCCall from './WebRTCCall';
+import { playReceived, playCallRing, stopCallRing } from './sounds';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || '';
-const ADMIN_IDS = (import.meta.env.VITE_ADMIN_USER_IDS || '1').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
-const isAdmin = (userId) => userId && ADMIN_IDS.length > 0 && ADMIN_IDS.includes(Number(userId));
-
-function parseInviteToken() {
-  const m = window.location.pathname.match(/^\/invite\/([a-zA-Z0-9_]+)/);
-  return m ? m[1] : null;
-}
+const BUILD_ID = 'chat-2026-02-10-02';
 
 function App() {
   const [user, setUser] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [currentConvId, setCurrentConvId] = useState(null);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [newChatInitialTab, setNewChatInitialTab] = useState('direct');
   const [socket, setSocket] = useState(null);
   const [error, setError] = useState('');
-  const [inviteToken, setInviteToken] = useState(() => parseInviteToken());
-  const [inviteLinkModal, setInviteLinkModal] = useState(null); // { link, copied? }
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [showBlockedModal, setShowBlockedModal] = useState(false);
-  const [blockedUsers, setBlockedUsers] = useState([]);
+  const [socketStatus, setSocketStatus] = useState('idle');
+  const [socketError, setSocketError] = useState('');
+  const [socketBase, setSocketBase] = useState('');
   const [showSettings, setShowSettings] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showInviteLink, setShowInviteLink] = useState(false);
+  const [showBlockUser, setShowBlockUser] = useState(false);
+  const [showMyId, setShowMyId] = useState(false);
+  const [showPendingCodes, setShowPendingCodes] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [activeCall, setActiveCall] = useState(null);
+  const [storiesFeed, setStoriesFeed] = useState([]);
+  const [showStoryCreate, setShowStoryCreate] = useState(false);
+  const [broadcastLists, setBroadcastLists] = useState([]);
 
   const token = localStorage.getItem('chat_token');
-
-  useEffect(() => {
-    const closeMenu = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-    };
-    document.addEventListener('click', closeMenu);
-    return () => document.removeEventListener('click', closeMenu);
-  }, []);
   const savedUser = localStorage.getItem('chat_user');
-
-  const handleInviteValid = () => {
-    setInviteToken(null);
-    window.history.replaceState({}, '', '/');
-  };
-
-  const handleCreateInviteLink = async () => {
-    if (inviteLoading) return;
-    setInviteLoading(true);
-    setError('');
-    try {
-      const data = await api.createInviteLink();
-      const link = window.location.origin + '/invite/' + (data.token || '');
-      setInviteLinkModal({ link, copied: false });
-    } catch (e) {
-      const msg = e.message || 'فشل إنشاء الرابط';
-      setError(msg);
-      alert(msg);
-    } finally {
-      setInviteLoading(false);
-    }
-  };
-
-  const copyInviteLink = () => {
-    if (inviteLinkModal?.link) {
-      navigator.clipboard?.writeText(inviteLinkModal.link).then(() => {
-        setInviteLinkModal((p) => (p ? { ...p, copied: true } : null));
-      });
-    }
-  };
-
-  useEffect(() => {
-    const theme = localStorage.getItem('chat_theme') || 'dark';
-    const wp = localStorage.getItem('chat_wallpaper') || 'default';
-    const bg = localStorage.getItem('chat_bg') || 'none';
-    const fs = localStorage.getItem('chat_font_size') || 'medium';
-    document.documentElement.dataset.theme = theme;
-    document.body.dataset.chatBg = bg;
-    document.documentElement.dataset.fontSize = fs;
-    const wpBg = wp === 'default' ? 'var(--bg)' : wp === 'dark' ? '#0d1117' : wp === 'blue' ? 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)' : wp === 'green' ? 'linear-gradient(135deg, #0d2818 0%, #1a3d2e 100%)' : wp === 'purple' ? 'linear-gradient(135deg, #1a0d2e 0%, #2d1b4e 100%)' : wp === 'light' ? '#f0f2f5' : 'var(--bg)';
-    document.documentElement.style.setProperty('--chat-wallpaper', wpBg);
-    document.body.style.background = wpBg;
-  }, []);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (savedUser && token) {
-      try {
-        setUser(JSON.parse(savedUser));
+        try {
+        const u = JSON.parse(savedUser);
+        setUser(u);
+        setIsAdmin(!!u?.isAdmin || u?.id === 1);
       } catch (_) {
         localStorage.removeItem('chat_user');
         localStorage.removeItem('chat_token');
@@ -97,12 +59,11 @@ function App() {
     }
   }, [token, savedUser]);
 
-  const handleUserUpdate = (updates) => {
-    if (!user) return;
-    const updated = { ...user, ...updates };
-    setUser(updated);
-    localStorage.setItem('chat_user', JSON.stringify(updated));
-  };
+  useEffect(() => {
+    if (user && token) {
+      api.getMe().then((d) => { if (d) { setIsAdmin(!!d.isAdmin); setUser((u) => u && ({ ...u, ...d })); localStorage.setItem('chat_user', JSON.stringify({ ...user, ...d })); } }).catch(() => {});
+    }
+  }, [user?.id, token]);
 
   const loadConversations = useCallback(async () => {
     if (!token) return;
@@ -120,21 +81,98 @@ function App() {
     loadConversations();
   }, [user, loadConversations]);
 
+  const loadBroadcastLists = useCallback(async () => {
+    if (!token) return;
+    try {
+      const list = await api.getBroadcastLists();
+      setBroadcastLists(list);
+    } catch (_) {}
+  }, [token]);
+
+  useEffect(() => {
+    if (user && token) loadBroadcastLists();
+  }, [user, token, loadBroadcastLists]);
+
+  const loadStories = useCallback(async () => {
+    if (!token) return;
+    try {
+      const feed = await api.getStories();
+      setStoriesFeed(feed || []);
+    } catch (_) {}
+  }, [token]);
+
+  useEffect(() => {
+    if (user && token) loadStories();
+  }, [user, token, loadStories]);
+
+  useEffect(() => {
+    if (!socket || !user) return;
+    socket.on('new_story', () => loadStories());
+    return () => socket.off('new_story');
+  }, [socket, user, loadStories]);
+
   useEffect(() => {
     if (!user || !token) return;
     const base = SOCKET_URL || window.location.origin;
+    setSocketBase(base);
+    setSocketStatus('connecting');
+    setSocketError('');
     const sock = io(base, { auth: { token }, transports: ['websocket', 'polling'] });
-    sock.on('new_message', () => {
-      loadConversations();
+    sock.on('connect', () => { setSocketStatus('connected'); setSocketError(''); });
+    sock.on('disconnect', () => setSocketStatus('disconnected'));
+    sock.on('connect_error', (err) => {
+      setSocketStatus('error');
+      setSocketError(err?.message || 'Socket connect_error');
     });
+    sock.on('new_message', (msg) => {
+      const isFromOthers = Number(msg.sender_id) !== Number(user?.id);
+      if (isFromOthers) playReceived();
+      setConversations((prev) => {
+        const rest = prev.filter((c) => c.id !== msg.conversation_id);
+        const conv = prev.find((c) => c.id === msg.conversation_id);
+        if (!conv) return prev;
+        return [{ ...conv }, ...rest];
+      });
+    });
+    sock.on('incoming_call', (data) => {
+      playCallRing();
+      setIncomingCall(data);
+    });
+    sock.on('call_ended', (data) => { stopCallRing(); setIncomingCall(null); setActiveCall(null); });
     setSocket(sock);
-    return () => sock.disconnect();
-  }, [user, token, loadConversations]);
+    return () => {
+      sock.off('new_message');
+      sock.off('incoming_call');
+      sock.off('call_ended');
+      sock.disconnect();
+    };
+  }, [user, token]);
+
+  useEffect(() => {
+    if (socket?.connected && conversations?.length > 0) {
+      conversations.forEach((c) => c?.id && socket.emit('join_conversation', c.id));
+    }
+  }, [socket, socketStatus, conversations]);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const key = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    if (!key || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    navigator.serviceWorker.ready.then(async (reg) => {
+      if (Notification.permission !== 'granted') return;
+      try {
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+        if (sub) await api.subscribePush(sub.toJSON());
+      } catch (_) {}
+    }).catch(() => {});
+  }, [user?.id, token]);
 
   const handleLogin = (data) => {
     localStorage.setItem('chat_token', data.token);
     localStorage.setItem('chat_user', JSON.stringify(data.user));
     setUser(data.user);
+    setIsAdmin(!!data.user?.isAdmin);
   };
 
   const handleLogout = () => {
@@ -159,73 +197,6 @@ function App() {
     }
   };
 
-  const handleBlockUser = async (targetUserId) => {
-    if (!confirm('هل تريد إيقاف وصول هذا المستخدم؟ لن يستطيع فتح التطبيق مرة أخرى حتى تعيد تفعيله.')) return;
-    try {
-      await api.blockUser(targetUserId);
-      setError('');
-      loadConversations();
-      setCurrentConvId(null);
-    } catch (e) {
-      setError(e.message || 'فشل إيقاف المستخدم');
-    }
-  };
-
-  const loadBlockedUsers = useCallback(async () => {
-    if (!isAdmin(user?.id)) return;
-    try {
-      const list = await api.getBlockedUsers();
-      setBlockedUsers(list);
-    } catch (_) {}
-  }, [user?.id]);
-
-  const handleUnblockUser = async (targetUserId) => {
-    try {
-      await api.unblockUser(targetUserId);
-      setBlockedUsers((prev) => prev.filter((u) => u.id !== targetUserId));
-    } catch (e) {
-      setError(e.message || 'فشل إعادة التفعيل');
-    }
-  };
-
-  const handleLeaveGroup = async (convId) => {
-    try {
-      await api.leaveGroup(convId);
-      setConversations((prev) => prev.filter((c) => c.id !== convId));
-      setCurrentConvId(null);
-      loadConversations();
-    } catch (e) {
-      setError(e.message || 'فشل مغادرة المجموعة');
-    }
-  };
-
-  const handleDeleteGroup = async (convId) => {
-    if (!confirm('هل أنت متأكد من حذف المجموعة نهائياً؟')) return;
-    try {
-      await api.deleteGroup(convId);
-      setConversations((prev) => prev.filter((c) => c.id !== convId));
-      setCurrentConvId(null);
-      loadConversations();
-    } catch (e) {
-      setError(e.message || 'فشل حذف المجموعة');
-    }
-  };
-
-  const handleConversationUpdate = (updated) => {
-    setConversations((prev) => prev.map((c) => (c.id === updated.id ? { ...c, memberIds: updated.memberIds, memberDetails: updated.memberDetails } : c)));
-  };
-
-  const handleRemoveMember = async (convId, targetUserId) => {
-    if (!confirm('هل تريد طرد هذا العضو من المجموعة؟')) return;
-    try {
-      await api.removeMemberFromGroup(convId, targetUserId);
-      const updated = await api.getConversation(convId);
-      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, memberIds: updated.memberIds || c.memberIds, memberDetails: updated.memberDetails || c.memberDetails } : c)));
-    } catch (e) {
-      setError(e.message || 'فشل طرد العضو');
-    }
-  };
-
   const handleCreateGroup = async (name, memberIds) => {
     try {
       setError('');
@@ -239,88 +210,116 @@ function App() {
     }
   };
 
-  if (inviteToken) {
-    return <InvitePage token={inviteToken} onValid={handleInviteValid} />;
+  const handleCreateBroadcast = async (name, recipientIds) => {
+    try {
+      setError('');
+      const list = await api.createBroadcastList(name, recipientIds);
+      setBroadcastLists((prev) => [{ ...list }, ...prev]);
+      setCurrentConvId('broadcast-' + list.id);
+      setShowNewChat(false);
+      loadBroadcastLists();
+    } catch (e) {
+      setError(e.message || 'فشل إنشاء القائمة');
+    }
+  };
+
+  const inviteToken = (() => { const m = typeof window !== 'undefined' && window.location.search.match(/\binvite=([^&]+)/); return m ? m[1] : null; })();
+
+  if (inviteToken && !user) {
+    return <InvitePage token={inviteToken} onValid={() => { window.history.replaceState({}, '', window.location.pathname); }} />;
   }
 
   if (!user) {
     return <Auth onLogin={handleLogin} />;
   }
 
-  const currentConv = conversations.find((c) => c.id === currentConvId) || (currentConvId ? { id: currentConvId, label: 'محادثة' } : null);
+  const currentConv = conversations.find((c) => c.id === currentConvId) || (currentConvId && !String(currentConvId).startsWith('broadcast-') ? { id: currentConvId, label: 'محادثة' } : null);
+  const isBroadcast = currentConvId && String(currentConvId).startsWith('broadcast-');
+  const broadcastListId = isBroadcast ? currentConvId.replace('broadcast-', '') : null;
+  const currentBroadcastList = broadcastLists.find((b) => String(b.id) === String(broadcastListId));
 
   return (
     <div className="app-container" style={{ display: 'flex', height: '100dvh', flexDirection: 'column', maxWidth: 900, margin: '0 auto', width: '100%' }}>
       <header className="app-header" style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 18px)' }}>Karas شات</h1>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '40%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {user?.avatar_url ? <img src={api.uploadsUrl(user.avatar_url)} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : null}
-          {user.name || user.email || user.phone || 'أنت'}
-          <span style={{ fontSize: 10, opacity: 0.8 }}>(معرف: {user.id})</span>
+        <h1 style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 18px)' }}>شات</h1>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: '30%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {user.avatar_url ? <img src={api.uploadsUrl(user.avatar_url)} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} /> : <span style={{ fontSize: 14 }}>👤</span>}
+          {user.name || user.email || user.phone || 'أنت'} ({user.id})
         </span>
-        <div ref={menuRef} style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((o) => !o)}
-            style={{ padding: '8px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}
-            title="القائمة والإعدادات"
-          >
-            <span>⚙</span>
-            <span>القائمة</span>
-          </button>
-          {menuOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: 4,
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                minWidth: 180,
-                zIndex: 25
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => { setShowSettings(true); setMenuOpen(false); }}
-                style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}
-              >
-                الإعدادات
-              </button>
-              {isAdmin(user?.id) && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => { setShowBlockedModal(true); loadBlockedUsers(); setMenuOpen(false); }}
-                    style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}
-                  >
-                    الموقوفون
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { handleCreateInviteLink(); setMenuOpen(false); }}
-                    disabled={inviteLoading}
-                    style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: inviteLoading ? 'var(--text-muted)' : 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 14, textAlign: 'right' }}
-                  >
-                    {inviteLoading ? 'جاري...' : 'رابط دعوة'}
-                  </button>
-                </>
-              )}
-              <div style={{ borderTop: '1px solid var(--border)' }} />
-              <button
-                type="button"
-                onClick={() => { handleLogout(); setMenuOpen(false); }}
-                style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', color: '#f85149', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}
-              >
-                خروج
-              </button>
-            </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
+          <button type="button" onClick={() => setShowMenu((v) => !v)} style={{ padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 13 }} title="القائمة">☰ القائمة</button>
+          {showMenu && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowMenu(false)} />
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, transform: 'translateX(-12px)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 10, minWidth: 240 }}>
+                {currentConvId && (
+                  <button type="button" onClick={() => { setCurrentConvId(null); setShowMenu(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>📋 المحادثات</button>
+                )}
+                <button type="button" onClick={() => { setShowMyId(true); setShowMenu(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>🆔 معرفي: {user.id}</button>
+                {isAdmin && (
+                  <>
+                    <button type="button" onClick={() => { setShowPendingCodes(true); setShowMenu(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>📥 التسجيلات والتفعيل</button>
+                    <button type="button" onClick={() => { setShowInviteLink(true); setShowMenu(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>🔗 رابط الدعوة (آيفون/أندرويد)</button>
+                    <button type="button" onClick={() => { setShowBlockUser(true); setShowMenu(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>🚫 إيقاف مستخدم</button>
+                  </>
+                )}
+                <button type="button" onClick={() => { setShowSettings(true); setShowMenu(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>⚙️ إعدادات المظهر (خط، ألوان، خلفية)</button>
+                {isAdmin && (
+                  <button type="button" onClick={async () => { setShowMenu(false); try { await api.resetDatabase(); } catch (_) {} localStorage.removeItem('chat_token'); localStorage.removeItem('chat_user'); setUser(null); setConversations([]); setCurrentConvId(null); if (socket) socket.disconnect(); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>🗑️ مسح كل البيانات والتسجيل من جديد</button>
+                )}
+                <button type="button" onClick={() => { handleLogout(); setShowMenu(false); }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', color: '#f85149', cursor: 'pointer', fontSize: 14, textAlign: 'right' }}>خروج</button>
+              </div>
+            </>
           )}
         </div>
       </header>
+      {showSettings && <Settings onClose={() => setShowSettings(false)} user={user} onUserUpdate={(u) => { setUser(u); localStorage.setItem('chat_user', JSON.stringify(u)); }} />}
+      {showInviteLink && <InviteLinkModal onClose={() => setShowInviteLink(false)} />}
+      {showBlockUser && <BlockUserModal onClose={() => setShowBlockUser(false)} />}
+      {showPendingCodes && <PendingCodesModal onClose={() => setShowPendingCodes(false)} />}
+      {incomingCall && !activeCall && (
+        <CallModal
+          isVoice
+          callerName={incomingCall.fromUserName}
+          isOutgoing={false}
+          onAnswer={() => {
+            stopCallRing();
+            socket?.emit('answer_call', { conversationId: incomingCall.conversationId, callerUserId: incomingCall.fromUserId });
+            setCurrentConvId(incomingCall.conversationId);
+            setActiveCall({ conversationId: incomingCall.conversationId, remoteUserId: incomingCall.fromUserId, isInitiator: false, isVideo: false });
+            setIncomingCall(null);
+          }}
+          onReject={() => { stopCallRing(); socket?.emit('reject_call', { conversationId: incomingCall.conversationId, callerUserId: incomingCall.fromUserId }); setIncomingCall(null); }}
+        />
+      )}
+      {activeCall && (
+        <WebRTCCall
+          socket={socket}
+          conversationId={activeCall.conversationId}
+          remoteUserId={activeCall.remoteUserId}
+          isInitiator={activeCall.isInitiator}
+          isVideo={activeCall.isVideo}
+          onEnd={() => { socket?.emit('hangup_call', { conversationId: activeCall.conversationId }); setActiveCall(null); }}
+        />
+      )}
+      {showMyId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setShowMyId(false)}>
+          <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 24, border: '1px solid var(--border)', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--text-muted)' }}>رقم المعرف</p>
+            <p style={{ margin: '0 0 16px', fontSize: 24, fontWeight: 600, direction: 'ltr' }}>{user.id}</p>
+            <button type="button" onClick={() => { navigator.clipboard?.writeText(String(user.id)); setShowMyId(false); }} style={{ padding: '8px 20px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 14 }}>نسخ</button>
+            <button type="button" onClick={() => setShowMyId(false)} style={{ marginRight: 8, padding: '8px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontSize: 14 }}>إغلاق</button>
+          </div>
+        </div>
+      )}
+      {typeof window !== 'undefined' && /[?&]debug=1/.test(window.location.search) && (
+        <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
+          <span>Build: {BUILD_ID}</span>
+          <span style={{ marginRight: 10 }}>• Socket: {socketStatus}</span>
+          {socketError && <span style={{ marginRight: 10, color: '#f85149' }}>({socketError})</span>}
+          {socketBase && <span style={{ display: 'block', opacity: 0.75, marginTop: 2, direction: 'ltr', textAlign: 'left' }}>base: {socketBase}</span>}
+        </div>
+      )}
       {error && <p style={{ padding: 6, margin: 0, background: 'rgba(248,81,73,0.15)', color: '#f85149', textAlign: 'center', fontSize: 13 }}>{error}</p>}
       <div className={`app-flex ${currentConvId ? 'room-open' : ''}`} style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         <div className="chat-list-wrap">
@@ -328,79 +327,40 @@ function App() {
             conversations={conversations}
             currentConvId={currentConvId}
             onSelect={setCurrentConvId}
-            onNewChat={() => setShowNewChat(true)}
+            onNewChat={(tab) => { setShowNewChat(true); setNewChatInitialTab(tab || 'direct'); }}
             onStartDirect={handleStartDirect}
             onCreateGroup={handleCreateGroup}
+            onCreateBroadcast={handleCreateBroadcast}
             showNewChat={showNewChat}
             onCloseNewChat={() => setShowNewChat(false)}
+            onConversationsUpdate={loadConversations}
+            currentUserId={user.id}
+            storiesFeed={storiesFeed}
+            onOpenStoryCreate={() => setShowStoryCreate(true)}
+            onStoriesRefresh={loadStories}
+            broadcastLists={broadcastLists}
+            onSelectBroadcast={(b) => { setCurrentConvId('broadcast-' + b.id); }}
+            newChatInitialTab={newChatInitialTab}
           />
+          {showStoryCreate && <StoryCreate onClose={() => setShowStoryCreate(false)} onCreated={loadStories} />}
         </div>
         <div className="chat-room-wrap">
-          {currentConvId ? (
+          {isBroadcast && currentBroadcastList ? (
+            <BroadcastCompose list={currentBroadcastList} onBack={() => setCurrentConvId(null)} onSent={loadConversations} />
+          ) : currentConvId ? (
             <ChatRoom
               conversation={currentConv}
+              conversations={conversations}
               socket={socket}
               currentUserId={user.id}
               onBack={() => setCurrentConvId(null)}
-              isAdmin={isAdmin(user?.id)}
-              onBlockUser={handleBlockUser}
-              onLeaveGroup={handleLeaveGroup}
-              onDeleteGroup={handleDeleteGroup}
-              onRemoveMember={handleRemoveMember}
-              onConversationUpdate={handleConversationUpdate}
+              onMembersUpdated={loadConversations}
             />
           ) : (
             <div className="chat-placeholder" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>اختر محادثة أو ابدأ محادثة جديدة</div>
           )}
         </div>
       </div>
-      {inviteLinkModal && (
-        <div onClick={() => setInviteLinkModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%' }}>
-            <h3 style={{ marginTop: 0 }}>رابط دعوة — للآيفون والأندرويد</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>الرابط يعمل على الجهازين. استخدمه مرة واحدة ولا يُعاد إرساله.</p>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ flex: 1, padding: 10, background: inviteLoading ? 'var(--text-muted)' : 'rgba(0,0,0,0.1)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 14 }}>{inviteLoading ? '...' : '📱 للآيفون'}</button>
-              <button type="button" onClick={handleCreateInviteLink} disabled={inviteLoading} style={{ flex: 1, padding: 10, background: inviteLoading ? 'var(--text-muted)' : 'rgba(0,0,0,0.1)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: inviteLoading ? 'wait' : 'pointer', fontSize: 14 }}>{inviteLoading ? '...' : '🤖 للأندرويد'}</button>
-            </div>
-            {inviteLinkModal.link && (
-              <>
-                <input type="text" readOnly value={inviteLinkModal.link} style={{ width: '100%', padding: 10, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg)', color: 'var(--text)', marginBottom: 12 }} />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" onClick={copyInviteLink} style={{ flex: 1, padding: 10, background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>{inviteLinkModal.copied ? 'تم النسخ ✓' : 'نسخ الرابط'}</button>
-                  <button type="button" onClick={() => setInviteLinkModal(null)} style={{ padding: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إغلاق</button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-      {showSettings && (
-        <Settings
-          user={user}
-          onClose={() => setShowSettings(false)}
-          onUpdate={handleUserUpdate}
-        />
-      )}
-      {showBlockedModal && isAdmin(user?.id) && (
-        <div onClick={() => setShowBlockedModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%', maxHeight: '70vh', overflow: 'auto' }}>
-            <h3 style={{ marginTop: 0 }}>المستخدمون الموقوفون</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>يمكنك إعادة تفعيل أي شخص من هنا</p>
-            {blockedUsers.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)' }}>لا يوجد موقوفون</p>
-            ) : (
-              blockedUsers.map((u) => (
-                <div key={u.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>{u.name || u.phone || u.email || '—'}</span>
-                  <button type="button" onClick={() => handleUnblockUser(u.id)} style={{ padding: '6px 12px', background: 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontSize: 12 }}>إعادة التفعيل</button>
-                </div>
-              ))
-            )}
-            <button type="button" onClick={() => setShowBlockedModal(false)} style={{ marginTop: 12, padding: '8px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer' }}>إغلاق</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
