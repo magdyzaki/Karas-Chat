@@ -5,6 +5,12 @@ const router = Router();
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '1').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
 const isAdmin = (id) => id && ADMIN_IDS.includes(Number(id));
 
+router.get('/', (req, res) => {
+  let users = db.listUsersExcept(req.userId);
+  users = users.filter((u) => !db.isUserBlocked(u.id));
+  res.json({ users });
+});
+
 router.post('/check-contacts', (req, res) => {
   const { phoneNumbers } = req.body || {};
   const arr = Array.isArray(phoneNumbers) ? phoneNumbers : (typeof phoneNumbers === 'string' ? [phoneNumbers] : []);
