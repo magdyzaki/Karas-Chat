@@ -82,6 +82,17 @@ app.post('/api/upload-avatar', jwtVerify, upload.single('file'), (req, res) => {
 
 app.set('io', io);
 const PORT = process.env.PORT || 5000;
+
+function shutdown(signal) {
+  console.log(signal, '- closing server...');
+  httpServer.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 httpServer.listen(PORT, () => console.log('Chat backend on', PORT));
 
 const userSockets = new Map();

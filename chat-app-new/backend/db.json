@@ -1,0 +1,216 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "email": null,
+      "phone": "01229084204",
+      "password_hash": "$2a$10$J6HQKkaQLsTO2lv4CW9uS.RJb/DkUYBBLzvtdPGBWnQUBYvWOkzeq",
+      "name": "magdy",
+      "avatar_url": null,
+      "verified": true,
+      "verification_code": null,
+      "verification_expires": null,
+      "created_at": "2026-02-13T12:14:29.553Z",
+      "last_seen_at": "2026-02-14T00:16:40.848Z"
+    },
+    {
+      "id": 2,
+      "email": null,
+      "phone": "01552077307",
+      "password_hash": "$2a$10$na.2eDQ5pPCHUC0llIDnp.FlJEm9lwc8C0N6U30y5v4YH1/iPyUFq",
+      "name": "Karas",
+      "avatar_url": null,
+      "verified": true,
+      "verification_code": null,
+      "verification_expires": null,
+      "created_at": "2026-02-13T13:36:08.491Z",
+      "last_seen_at": "2026-02-13T17:49:53.401Z"
+    },
+    {
+      "id": 3,
+      "email": null,
+      "phone": "01111213736",
+      "password_hash": "$2a$10$01IaKHkC1m3NBkpzFNcVh.DheTwDzb.tFNd8oH7FM5HC/Pm3FqGSW",
+      "name": "Nawal",
+      "avatar_url": null,
+      "verified": true,
+      "verification_code": null,
+      "verification_expires": null,
+      "created_at": "2026-02-13T21:50:56.543Z",
+      "last_seen_at": "2026-02-14T00:11:47.904Z"
+    }
+  ],
+  "conversations": [
+    {
+      "id": 1,
+      "type": "direct",
+      "name": null,
+      "created_at": "2026-02-13T13:37:25.584Z",
+      "created_by": 2
+    },
+    {
+      "id": 2,
+      "type": "direct",
+      "name": null,
+      "created_at": "2026-02-13T21:51:52.525Z",
+      "created_by": 3
+    }
+  ],
+  "conversation_members": [
+    {
+      "conversation_id": 1,
+      "user_id": 2,
+      "joined_at": "2026-02-13T13:37:25.584Z"
+    },
+    {
+      "conversation_id": 1,
+      "user_id": 1,
+      "joined_at": "2026-02-13T13:37:25.584Z"
+    },
+    {
+      "conversation_id": 2,
+      "user_id": 3,
+      "joined_at": "2026-02-13T21:51:52.525Z"
+    },
+    {
+      "conversation_id": 2,
+      "user_id": 1,
+      "joined_at": "2026-02-13T21:51:52.525Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": 1,
+      "conversation_id": 1,
+      "sender_id": 1,
+      "type": "text",
+      "content": "💌",
+      "file_name": null,
+      "reply_to_id": null,
+      "reply_to_snippet": null,
+      "created_at": "2026-02-13T13:45:02.799Z"
+    },
+    {
+      "id": 2,
+      "conversation_id": 1,
+      "sender_id": 1,
+      "type": "text",
+      "content": "❤️",
+      "file_name": null,
+      "reply_to_id": null,
+      "reply_to_snippet": null,
+      "created_at": "2026-02-13T13:45:20.376Z"
+    },
+    {
+      "id": 3,
+      "conversation_id": 1,
+      "sender_id": 1,
+      "type": "text",
+      "content": "اهلا",
+      "file_name": null,
+      "reply_to_id": null,
+      "reply_to_snippet": null,
+      "created_at": "2026-02-13T14:35:34.664Z"
+    },
+    {
+      "id": 4,
+      "conversation_id": 1,
+      "sender_id": 1,
+      "type": "text",
+      "content": "اه",
+      "file_name": null,
+      "reply_to_id": null,
+      "reply_to_snippet": null,
+      "created_at": "2026-02-13T15:03:43.523Z"
+    },
+    {
+      "id": 5,
+      "conversation_id": 2,
+      "sender_id": 3,
+      "type": "text",
+      "content": "Hi",
+      "file_name": null,
+      "reply_to_id": null,
+      "reply_to_snippet": null,
+      "encrypted": false,
+      "iv": null,
+      "created_at": "2026-02-13T21:51:58.881Z"
+    }
+  ],
+  "conversation_reads": [
+    {
+      "conversation_id": 1,
+      "user_id": 1,
+      "last_message_id": 4,
+      "last_read_at": "2026-02-13T17:27:31.696Z"
+    },
+    {
+      "conversation_id": 2,
+      "user_id": 3,
+      "last_message_id": 5,
+      "last_read_at": "2026-02-13T22:12:40.776Z"
+    },
+    {
+      "conversation_id": 2,
+      "user_id": 1,
+      "last_message_id": 5,
+      "last_read_at": "2026-02-13T22:17:16.234Z"
+    }
+  ],
+  "invite_links": [
+    {
+      "token": "i_mlkv37gb_on3s77n8",
+      "created_by": 1,
+      "created_at": "2026-02-13T12:26:20.412Z",
+      "used_at": null
+    },
+    {
+      "token": "i_mlkvgtdt_4axbn6qg",
+      "created_by": 1,
+      "created_at": "2026-02-13T12:36:55.362Z",
+      "used_at": null
+    },
+    {
+      "token": "i_mlkw94g9_082u7lof",
+      "created_by": 1,
+      "created_at": "2026-02-13T12:58:56.073Z",
+      "used_at": null
+    },
+    {
+      "token": "i_mlkwajho_a88zribl",
+      "created_by": 1,
+      "created_at": "2026-02-13T13:00:02.220Z",
+      "used_at": null
+    },
+    {
+      "token": "i_mlkwl5ij_rjvfpvgk",
+      "created_by": 1,
+      "created_at": "2026-02-13T13:08:17.323Z",
+      "used_at": null
+    }
+  ],
+  "blocked_user_ids": [],
+  "push_subscriptions": [
+    {
+      "user_id": 1,
+      "endpoint": "https://fcm.googleapis.com/fcm/send/d65QibC7zzM:APA91bEScbMw5RvPxmfVfnhdeIfEMC7fFRJtMJ_M3nFAS7qGwXjdPWpKrhisAshDeNt8tXtzSl3ogTZMvw3HUAcOdz9Z9iw8xnbncKmILEtr8VtinxWO8rOAfY7bXykN-kpApTZ2Hout",
+      "keys": {
+        "p256dh": "BN9ThJVSzPvcCfF076RFtSlv60V5Ec9bl1xj9WLJhYSqC8ic8LMIAeXUxXuxUC_fZsPP4gFhjqtpzY_1fZCmsU8",
+        "auth": "UVkIMsVx_Hog24E8Gq65sQ"
+      },
+      "updated_at": "2026-02-13T22:08:20.999Z"
+    }
+  ],
+  "user_conversation_prefs": [],
+  "message_reactions": [],
+  "stories": [],
+  "poll_votes": [],
+  "broadcast_lists": [],
+  "user_public_keys": [
+    {
+      "user_id": 1,
+      "public_key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEynM/O32ZU2pjz1yEISegjSZonNF3Usp1QAhQ9ySVvWU8Sx2I4MMJzyNK1u5ucTe8CcZODtx0O4ZXpYGJVzwZVg==",
+      "created_at": "2026-02-13T22:17:16.180Z"
+    }
+  ]
+}
