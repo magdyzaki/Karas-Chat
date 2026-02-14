@@ -1,74 +1,103 @@
-// WebRTCCall.jsx
-
 import React, { useEffect, useRef, useState } from 'react';
+import io from 'socket.io-client';
+
+const socket = io("your_server_endpoint");
 
 const WebRTCCall = () => {
-    const [remoteStream, setRemoteStream] = useState(null);
     const [localStream, setLocalStream] = useState(null);
-    const peerConnectionRef = useRef(null);
+    const [remoteStream, setRemoteStream] = useState(null);
+    const [peerConnection, setPeerConnection] = useState(null);
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [error, setError] = useState(null);
+
+    const localVideoRef = useRef(null);
+    const remoteVideoRef = useRef(null);
 
     useEffect(() => {
-        const initLocalStream = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                setLocalStream(stream);
-                const videoElement = document.getElementById('localVideo');
-                if (videoElement) videoElement.srcObject = stream;
-            } catch (error) {
-                console.error('Error accessing media devices.', error);
+        const pc = new RTCPeerConnection();
+        setPeerConnection(pc);
+
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('candidate', event.candidate);
             }
         };
 
-        initLocalStream();
+        pc.ontrack = (event) => {
+            setRemoteStream(event.streams[0]);
+        };
+
+        return () => {
+            pc.close();
+        };
     }, []);
 
     useEffect(() => {
-        const peerConnection = new RTCPeerConnection();
-        peerConnectionRef.current = peerConnection;
-
-        const addTracksToPeerConnection = () => {
-            localStream && localStream.getTracks().forEach(track => {
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStream);
             });
-        };
+        }
+    }, [localStream, peerConnection]);
 
-        const handleTrackEvent = ({ streams }) => {
-            setRemoteStream(streams[0]);
-            const remoteVideoElement = document.getElementById('remoteVideo');
-            if (remoteVideoElement) remoteVideoElement.srcObject = streams[0];
-        };
+    const startCall = async () => {
+        setIsConnecting(true);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+            setLocalStream(stream);
+            localVideoRef.current.srcObject = stream;
 
-        peerConnection.ontrack = handleTrackEvent;
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('offer', offer);
+        } catch (err) {
+            setError("Failed to access media devices: " + err.message);
+        } finally {
+            setIsConnecting(false);
+        }
+    };
 
-        const handleICECandidate = (event) => {
-            if (event.candidate) {
-                console.log('New ICE candidate: ', event.candidate);
-                // Send the candidate to the remote peer
+    useEffect(() => {
+        socket.on('offer', async (offer) => {
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(offer);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                socket.emit('answer', answer);
             }
-        };
+        });
 
-        peerConnection.onicecandidate = handleICECandidate;
-
-        const handleConnectionStateChange = () => {
-            console.log('Connection State: ', peerConnection.connectionState);
-            if (peerConnection.connectionState === 'failed') {
-                console.error('Connection failed.');
+        socket.on('answer', (answer) => {
+            if (peerConnection) {
+                peerConnection.setRemoteDescription(answer);
             }
-        };
+        });
 
-        peerConnection.onconnectionstatechange = handleConnectionStateChange;
+        socket.on('candidate', (candidate) => {
+            if (peerConnection) {
+                peerConnection.addIceCandidate(candidate);
+            }
+        });
 
-        addTracksToPeerConnection();
+        return () => socket.off();
+    }, [peerConnection]);
 
-        return () => {
-            peerConnection.close();
-        };
-    }, [localStream]);
+    useEffect(() => {
+        if (remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
 
     return (
         <div>
-            <video id="localVideo" autoPlay muted></video>
-            <video id="remoteVideo" autoPlay></video>
+            <h1>WebRTC Call</h1>
+            {error && <p>{error}</p>}
+            <video ref={localVideoRef} autoPlay muted></video>
+            <video ref={remoteVideoRef} autoPlay></video>
+            <button onClick={startCall} disabled={isConnecting}>Start Call</button>
         </div>
     );
 };
