@@ -403,6 +403,10 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
 
   const startRecording = async () => {
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setFileError(window.isSecureContext ? 'المتصفح لا يدعم التسجيل الصوتي' : 'التسجيل يتطلب HTTPS أو localhost');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
       audioChunksRef.current = [];
