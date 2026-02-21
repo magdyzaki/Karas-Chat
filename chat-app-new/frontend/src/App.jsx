@@ -223,10 +223,27 @@ function App() {
     }
   };
 
-  const inviteToken = (() => { const m = typeof window !== 'undefined' && window.location.search.match(/\binvite=([^&]+)/); return m ? m[1] : null; })();
+  const search = typeof window !== 'undefined' ? window.location.search : '';
+  const inviteToken = (() => { const m = search.match(/\binvite=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; })();
+  const consumed = /\bconsumed=1\b/.test(search);
+  const inviteError = (() => { const m = search.match(/\binvite_error=([^&]+)/); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null; })();
 
-  if (inviteToken && !user) {
-    return <InvitePage token={inviteToken} onValid={() => { window.location.href = window.location.pathname || '/'; }} />;
+  if (inviteError && !user) {
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <p style={{ color: '#f85149', fontSize: 18, marginBottom: 16 }}>⚠ {inviteError}</p>
+        <a href="/" style={{ padding: '12px 24px', background: 'var(--primary)', color: '#fff', borderRadius: 8, textDecoration: 'none', fontSize: 16 }}>انتقل للتطبيق</a>
+      </div>
+    );
+  }
+
+  if (inviteToken && !user && !consumed) {
+    window.location.href = `/api/consume-invite-redirect?token=${encodeURIComponent(inviteToken)}`;
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p>جاري تفعيل الرابط...</p>
+      </div>
+    );
   }
 
   if (!user) {

@@ -24,7 +24,7 @@ export default function InviteLinkModal({ onClose }) {
       const { token } = await api.createInviteLink();
       const base = getInviteBaseUrl();
       if (!base) throw new Error('رابط التطبيق غير مضبوط. أضف VITE_APP_URL عند بناء الـ APK.');
-      const url = `${base}?invite=${token}`;
+      const url = `${base}/api/consume-invite-redirect?token=${encodeURIComponent(token)}`;
       setLink(url);
     } catch (e) {
       setError(e.message || 'فشل إنشاء الرابط');
