@@ -29,6 +29,7 @@ export default function Auth({ onLogin }) {
     const m = typeof window !== 'undefined' && window.location.search.match(/\binvite=([^&]+)/);
     if (m && m[1]) {
       try { setInviteCode(decodeURIComponent(m[1]).trim()); } catch (_) { setInviteCode(String(m[1]).trim()); }
+      setMode('register');
     }
   }, []);
 
