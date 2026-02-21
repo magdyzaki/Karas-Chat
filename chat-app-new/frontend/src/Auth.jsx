@@ -27,7 +27,9 @@ export default function Auth({ onLogin }) {
   useEffect(() => {
     api.getAuthConfig().then((c) => setInviteRequired(!!c?.inviteRequired)).catch(() => {});
     const m = typeof window !== 'undefined' && window.location.search.match(/\binvite=([^&]+)/);
-    if (m) setInviteCode(m[1] || '');
+    if (m && m[1]) {
+      try { setInviteCode(decodeURIComponent(m[1]).trim()); } catch (_) { setInviteCode(String(m[1]).trim()); }
+    }
   }, []);
 
   const goTo = (m) => { setMode(m); setError(''); setCode(''); setNewPassword(''); };
@@ -171,10 +173,10 @@ export default function Auth({ onLogin }) {
           {!isLogin && (
             <>
               <input type="text" placeholder="الاسم" value={name} onChange={(e) => setName(e.target.value)} style={styles.input} />
-              {inviteRequired && (
+              {(inviteRequired || inviteCode) && (
                 <input
                   type="text"
-                  placeholder="رمز الدعوة (من الرابط اللي أرسله لك المسؤول)"
+                  placeholder="رمز الدعوة (من الرابط أو أدخله يدوياً)"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                   style={styles.input}
