@@ -364,10 +364,20 @@ export async function uploadFile(file) {
 
 export async function consumeInviteLink(token) {
   const useProxy = typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
-  const url = useProxy ? '/api/consume-invite' : `${API_BASE}/api/consume-invite/${token}`;
-  const opts = useProxy ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) } : { method: 'POST' };
-  const res = await fetchWithRetry(url, opts);
-  return res.json().catch(() => ({}));
+  const tryRequest = async (url, opts) => {
+    const res = await fetchWithRetry(url, opts);
+    const data = await res.json().catch(() => ({}));
+    return { res, data };
+  };
+  if (useProxy) {
+    try {
+      const { res, data } = await tryRequest('/api/consume-invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+      if (res.ok || data.ok !== undefined) return data;
+    } catch (_) {}
+  }
+  if (!API_BASE) return {};
+  const { data } = await tryRequest(`${API_BASE}/api/consume-invite/${token}`, { method: 'POST' });
+  return data;
 }
 
 export async function createInviteLink() {
