@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import * as api from './api';
 
-const BASE_URL = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
+// في الـ APK (Capacitor): origin يكون capacitor://localhost — نستخدم رابط الويب المُعدّ مسبقاً
+function getInviteBaseUrl() {
+  if (typeof window === 'undefined') return import.meta.env.VITE_APP_URL || '';
+  const o = window.location.origin || '';
+  if (o.startsWith('capacitor://') || o.startsWith('file://') || o === 'null' || o.includes('localhost')) {
+    return (import.meta.env.VITE_APP_URL || '').replace(/\/$/, '');
+  }
+  return (window.location.origin + (window.location.pathname || '/')).replace(/\/$/, '');
+}
 
 export default function InviteLinkModal({ onClose }) {
   const [loading, setLoading] = useState(false);
@@ -14,7 +22,9 @@ export default function InviteLinkModal({ onClose }) {
     setLoading(true);
     try {
       const { token } = await api.createInviteLink();
-      const url = `${BASE_URL}?invite=${token}`;
+      const base = getInviteBaseUrl();
+      if (!base) throw new Error('رابط التطبيق غير مضبوط. أضف VITE_APP_URL عند بناء الـ APK.');
+      const url = `${base}?invite=${token}`;
       setLink(url);
     } catch (e) {
       setError(e.message || 'فشل إنشاء الرابط');

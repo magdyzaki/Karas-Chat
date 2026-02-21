@@ -1,5 +1,29 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+/** يستخدم للطلبات الأولى عند استيقاظ السيرفر (Render cold start) */
+async function fetchWithRetry(url, opts = {}, { retries = 3, timeoutMs = 90000 } = {}) {
+  for (let i = 0; i < retries; i++) {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...opts, signal: ctrl.signal });
+      clearTimeout(id);
+      return res;
+    } catch (e) {
+      clearTimeout(id);
+      if (i === retries - 1) throw e;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  throw new Error('فشل الاتصال بعد عدة محاولات');
+}
+
+/** إيقاظ السيرفر عند فتح صفحة الدعوة */
+export function prewakeBackend() {
+  if (!API_BASE) return;
+  fetch(`${API_BASE}/api/health`).catch(() => {});
+}
+
 export async function searchGifs(q) {
   const res = await fetch(`${API_BASE}/api/giphy/search?q=${encodeURIComponent(q || '')}`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
@@ -26,11 +50,17 @@ function headers() {
   };
 }
 
-export async function register(emailOrPhone, password, name = '') {
+export async function getAuthConfig() {
+  const res = await fetch(`${API_BASE}/api/auth/config`);
+  const data = await res.json().catch(() => ({}));
+  return data;
+}
+
+export async function register(emailOrPhone, password, name = '', inviteToken = '') {
   const res = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ emailOrPhone, password, name })
+    body: JSON.stringify({ emailOrPhone, password, name, inviteToken: inviteToken || undefined })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل التسجيل');
@@ -332,7 +362,7 @@ export async function uploadFile(file) {
 }
 
 export async function consumeInviteLink(token) {
-  const res = await fetch(`${API_BASE}/api/consume-invite/${token}`, { method: 'POST' });
+  const res = await fetchWithRetry(`${API_BASE}/api/consume-invite/${token}`, { method: 'POST' });
   return res.json().catch(() => ({}));
 }
 

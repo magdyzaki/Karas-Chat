@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as api from './api';
 
 const styles = {
@@ -19,8 +19,16 @@ export default function Auth({ onLogin }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteRequired, setInviteRequired] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.getAuthConfig().then((c) => setInviteRequired(!!c?.inviteRequired)).catch(() => {});
+    const m = typeof window !== 'undefined' && window.location.search.match(/\binvite=([^&]+)/);
+    if (m) setInviteCode(m[1] || '');
+  }, []);
 
   const goTo = (m) => { setMode(m); setError(''); setCode(''); setNewPassword(''); };
 
@@ -41,7 +49,7 @@ export default function Auth({ onLogin }) {
           setError('البريد أو رقم الموبايل وكلمة المرور مطلوبان');
           return;
         }
-        const data = await api.register(emailOrPhone.trim(), password, name);
+        const data = await api.register(emailOrPhone.trim(), password, name, inviteCode.trim());
         if (data.token && data.user) {
           onLogin(data);
         } else if (data.needsApproval) {
@@ -161,7 +169,19 @@ export default function Auth({ onLogin }) {
         {error && <p style={styles.err}>{error}</p>}
         <form onSubmit={handleSubmit}>
           {!isLogin && (
-            <input type="text" placeholder="الاسم" value={name} onChange={(e) => setName(e.target.value)} style={styles.input} />
+            <>
+              <input type="text" placeholder="الاسم" value={name} onChange={(e) => setName(e.target.value)} style={styles.input} />
+              {inviteRequired && (
+                <input
+                  type="text"
+                  placeholder="رمز الدعوة (من الرابط اللي أرسله لك المسؤول)"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  style={styles.input}
+                  required={inviteRequired}
+                />
+              )}
+            </>
           )}
           <input
             type="text"

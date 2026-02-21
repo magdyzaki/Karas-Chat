@@ -27,6 +27,7 @@ const CAN_SEND_EMAIL = !!(process.env.SMTP_HOST || process.env.RESEND_API_KEY);
 const CAN_SEND_SMS = !!process.env.TWILIO_ACCOUNT_SID;
 const SKIP_VERIFICATION = process.env.SKIP_VERIFICATION === 'true';
 const APPROVAL_MODE = process.env.APPROVAL_MODE === 'true';
+const INVITE_ONLY = process.env.INVITE_ONLY === 'true';
 const TRUSTED_PHONES = (process.env.TRUSTED_PHONES || '')
   .split(',')
   .map((s) => s.replace(/\D/g, '')).filter(Boolean);
@@ -61,14 +62,28 @@ function parseEmailOrPhone(input) {
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '1').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
 const isAdmin = (id) => id && ADMIN_IDS.includes(Number(id));
 
+router.get('/config', (req, res) => {
+  res.json({ inviteRequired: INVITE_ONLY });
+});
+
 function userToResponse(user) {
   if (!user) return null;
   return { id: user.id, email: user.email || null, phone: user.phone || null, name: user.name, avatar_url: user.avatar_url || null, isAdmin: isAdmin(user.id) };
 }
 
 router.post('/register', async (req, res) => {
-  const { emailOrPhone, password, name } = req.body || {};
+  const { emailOrPhone, password, name, inviteToken } = req.body || {};
   if (!emailOrPhone || !password) return res.status(400).json({ error: 'البريد أو رقم الموبايل وكلمة المرور مطلوبان' });
+
+  // في وضع الدعوة فقط: يجب وجود رمز دعوة صالح
+  if (INVITE_ONLY) {
+    const token = String(inviteToken || '').trim();
+    if (!token) return res.status(403).json({ error: 'تحتاج رمز دعوة للتسجيل. اطلب الرابط من المسؤول.' });
+    const link = db.getInviteLink(token);
+    if (!link) return res.status(403).json({ error: 'رمز الدعوة غير صالح.' });
+    if (link.used_at) return res.status(403).json({ error: 'تم استخدام رمز الدعوة مسبقاً.' });
+  }
+
   const { email, phone } = parseEmailOrPhone(emailOrPhone);
   if (!email && !phone) return res.status(400).json({ error: 'أدخل بريداً إلكترونياً صحيحاً أو رقم موبايل (10 أرقام على الأقل)' });
   if (email && db.findUserByEmail(email)) return res.status(400).json({ error: 'البريد مستخدم مسبقاً' });
@@ -84,6 +99,10 @@ router.post('/register', async (req, res) => {
     verification_code: code,
     verification_expires: expires
   });
+
+  // استهلاك رمز الدعوة بعد نجاح التسجيل
+  if (INVITE_ONLY && inviteToken) db.consumeInviteLink(String(inviteToken).trim());
+
   if (SKIP_VERIFICATION || (phone && isTrustedPhone(phone))) {
     db.setUserVerified(user.id, true);
     const verifiedUser = db.findUserById(user.id);

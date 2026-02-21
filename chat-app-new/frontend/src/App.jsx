@@ -226,7 +226,7 @@ function App() {
   const inviteToken = (() => { const m = typeof window !== 'undefined' && window.location.search.match(/\binvite=([^&]+)/); return m ? m[1] : null; })();
 
   if (inviteToken && !user) {
-    return <InvitePage token={inviteToken} onValid={() => { window.history.replaceState({}, '', window.location.pathname); }} />;
+    return <InvitePage token={inviteToken} onValid={() => { window.location.href = window.location.pathname || '/'; }} />;
   }
 
   if (!user) {

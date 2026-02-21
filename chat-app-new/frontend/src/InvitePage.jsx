@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as api from './api';
 
 export default function InvitePage({ token, onValid }) {
+  useEffect(() => { api.prewakeBackend(); }, []);
   const [status, setStatus] = useState('valid'); // valid | invalid
   const [error, setError] = useState('');
   const [consuming, setConsuming] = useState(false);
@@ -9,14 +10,21 @@ export default function InvitePage({ token, onValid }) {
   const handleGoToApp = async () => {
     if (!token || consuming) return;
     setConsuming(true);
-    const data = await api.consumeInviteLink(token);
-    if (data.ok) {
-      onValid?.();
-    } else {
+    setError('');
+    try {
+      const data = await api.consumeInviteLink(token);
+      if (data.ok) {
+        onValid?.();
+      } else {
+        setStatus('invalid');
+        setError(data.error || 'الرابط مُستهلَك أو غير صالح');
+      }
+    } catch (e) {
       setStatus('invalid');
-      setError(data.error || 'الرابط مُستهلَك أو غير صالح');
+      setError(e?.message || 'فشل الاتصال. تحقق من الإنترنت وحاول مرة أخرى.');
+    } finally {
+      setConsuming(false);
     }
-    setConsuming(false);
   };
 
   if (!token) {
@@ -47,15 +55,20 @@ export default function InvitePage({ token, onValid }) {
             <p style={{ margin: 0, fontSize: 15 }}>3. اضغط <strong>إضافة</strong></p>
           </div>
         )}
-        <button type="button" onClick={handleGoToApp} disabled={consuming} style={{ padding: '12px 24px', background: consuming ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: consuming ? 'wait' : 'pointer', fontSize: 16 }}>{consuming ? '...' : 'انتقل إلى التطبيق'}</button>
+        <button type="button" onClick={handleGoToApp} disabled={consuming} style={{ padding: '12px 24px', background: consuming ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: consuming ? 'wait' : 'pointer', fontSize: 16 }}>{consuming ? 'جاري الاتصال...' : 'انتقل إلى التطبيق'}</button>
       </div>
     );
   }
 
+  const isNetworkError = /fetch|شبكة|اتصال|Failed/i.test(error || '');
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
-      <p style={{ color: '#f85149', fontSize: 18, marginBottom: 8 }}>⚠ الرابط غير صالح</p>
-      <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{error}</p>
+      <p style={{ color: '#f85149', fontSize: 18, marginBottom: 8 }}>⚠ حدث خطأ</p>
+      <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>{error}</p>
+      {isNetworkError && (
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>💡 جرّب شبكة واي فاي بدل بيانات الجوال</p>
+      )}
+      <button type="button" onClick={() => { setError(''); handleGoToApp(); }} disabled={consuming} style={{ padding: '10px 20px', background: consuming ? 'var(--text-muted)' : 'var(--primary)', border: 'none', borderRadius: 8, color: '#fff', cursor: consuming ? 'wait' : 'pointer', fontSize: 15 }}>{consuming ? 'جاري المحاولة...' : 'حاول مرة أخرى'}</button>
     </div>
   );
 }
