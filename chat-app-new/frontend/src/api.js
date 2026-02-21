@@ -369,15 +369,21 @@ export async function consumeInviteLink(token) {
     const data = await res.json().catch(() => ({}));
     return { res, data };
   };
+  // المحاولة الأولى: مباشرة إلى Render (مهلة 90 ثانية، يتعامل مع استيقاظ السيرفر)
+  if (API_BASE) {
+    try {
+      const { res, data } = await tryRequest(`${API_BASE}/api/consume-invite/${token}`, { method: 'POST' });
+      if (res.ok || data.ok !== undefined) return data;
+    } catch (_) {}
+  }
+  // الاحتياطي: عبر Proxy على Vercel (يتجاوز حظر شبكة Render)
   if (useProxy) {
     try {
       const { res, data } = await tryRequest('/api/consume-invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
       if (res.ok || data.ok !== undefined) return data;
     } catch (_) {}
   }
-  if (!API_BASE) return {};
-  const { data } = await tryRequest(`${API_BASE}/api/consume-invite/${token}`, { method: 'POST' });
-  return data;
+  throw new Error('فشل الاتصال. تحقق من الإنترنت وحاول مرة أخرى.');
 }
 
 export async function createInviteLink() {
