@@ -364,8 +364,6 @@ export async function uploadFile(file) {
 
 export async function consumeInviteLink(token) {
   const useProxy = typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
-  const proxyOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) };
-  const directOpts = { method: 'POST' };
   const tryRequest = async (url, opts) => {
     const res = await fetchWithRetry(url, opts);
     const data = await res.json().catch(() => ({}));
@@ -379,8 +377,10 @@ export async function consumeInviteLink(token) {
     return null;
   };
   if (useProxy) {
+    const encoded = encodeURIComponent(token);
     for (let i = 0; i < 3; i++) {
-      const data = await tryOnce('/api/consume-invite', proxyOpts);
+      const data = await tryOnce(`/api/consume-invite?token=${encoded}`, { method: 'GET' }) ||
+        await tryOnce('/api/consume-invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
       if (data) return data;
       if (i < 2) await new Promise((r) => setTimeout(r, 5000));
     }
