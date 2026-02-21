@@ -32,7 +32,12 @@ const io = new Server(httpServer, {
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
+
+app.get('/', (req, res) => res.json({ ok: true, msg: 'Chat API - استخدم التطبيق' }));
+app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
 
@@ -93,7 +98,8 @@ function shutdown(signal) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-httpServer.listen(PORT, () => console.log('Chat backend on', PORT));
+const HOST = process.env.HOST || '0.0.0.0';
+httpServer.listen(PORT, HOST, () => console.log('Chat backend on', HOST + ':' + PORT));
 
 const userSockets = new Map();
 const activeGroupCalls = new Map();
