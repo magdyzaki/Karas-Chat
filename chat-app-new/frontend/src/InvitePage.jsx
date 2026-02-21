@@ -12,6 +12,7 @@ export default function InvitePage({ token, onValid }) {
     setConsuming(true);
     setError('');
     try {
+      api.prewakeBackend(); // إيقاظ إضافي قبل الطلب
       const data = await api.consumeInviteLink(token);
       if (data.ok) {
         onValid?.();

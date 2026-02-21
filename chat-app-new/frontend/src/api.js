@@ -369,17 +369,17 @@ export async function consumeInviteLink(token) {
     const data = await res.json().catch(() => ({}));
     return { res, data };
   };
-  // المحاولة الأولى: مباشرة إلى Render (مهلة 90 ثانية، يتعامل مع استيقاظ السيرفر)
-  if (API_BASE) {
-    try {
-      const { res, data } = await tryRequest(`${API_BASE}/api/consume-invite/${token}`, { method: 'POST' });
-      if (res.ok || data.ok !== undefined) return data;
-    } catch (_) {}
-  }
-  // الاحتياطي: عبر Proxy على Vercel (يتجاوز حظر شبكة Render)
+  // على Vercel: نستخدم Proxy فقط (نفس النطاق، لا CORS، الطلب من المتصفح إلى karas-chat.vercel.app فقط)
   if (useProxy) {
     try {
       const { res, data } = await tryRequest('/api/consume-invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+      if (res.ok || data.ok !== undefined) return data;
+    } catch (_) {}
+  }
+  // محلي أو عند فشل الـ proxy: طلب مباشر إلى Render
+  if (API_BASE) {
+    try {
+      const { res, data } = await tryRequest(`${API_BASE}/api/consume-invite/${encodeURIComponent(token)}`, { method: 'POST' });
       if (res.ok || data.ok !== undefined) return data;
     } catch (_) {}
   }
