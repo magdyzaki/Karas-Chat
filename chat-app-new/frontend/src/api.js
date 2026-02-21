@@ -1,5 +1,9 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+/** عند الويب: استخدم proxy على Vercel لتجاوز Failed to fetch مع Render */
+const useAuthProxy = () => typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
+const authBase = () => (useAuthProxy() ? '' : API_BASE);
+
 /** يستخدم للطلبات الأولى عند استيقاظ السيرفر (Render cold start) */
 async function fetchWithRetry(url, opts = {}, { retries = 3, timeoutMs = 90000 } = {}) {
   for (let i = 0; i < retries; i++) {
@@ -52,13 +56,15 @@ function headers() {
 }
 
 export async function getAuthConfig() {
-  const res = await fetch(`${API_BASE}/api/auth/config`);
+  const base = authBase();
+  const res = await fetch(`${base}/api/auth/config`);
   const data = await res.json().catch(() => ({}));
   return data;
 }
 
 export async function register(emailOrPhone, password, name = '', inviteToken = '') {
-  const res = await fetch(`${API_BASE}/api/auth/register`, {
+  const base = authBase();
+  const res = await fetch(`${base}/api/auth/register`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ emailOrPhone, password, name, inviteToken: inviteToken || undefined })
@@ -69,7 +75,8 @@ export async function register(emailOrPhone, password, name = '', inviteToken = 
 }
 
 export async function login(emailOrPhone, password) {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
+  const base = authBase();
+  const res = await fetch(`${base}/api/auth/login`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ emailOrPhone, password })
@@ -80,7 +87,8 @@ export async function login(emailOrPhone, password) {
 }
 
 export async function verify(emailOrPhone, code) {
-  const res = await fetch(`${API_BASE}/api/auth/verify`, {
+  const base = authBase();
+  const res = await fetch(`${base}/api/auth/verify`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ emailOrPhone, code })
@@ -91,7 +99,8 @@ export async function verify(emailOrPhone, code) {
 }
 
 export async function forgotPassword(emailOrPhone) {
-  const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+  const base = authBase();
+  const res = await fetch(`${base}/api/auth/forgot-password`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ emailOrPhone })
@@ -110,7 +119,8 @@ export async function getDevLastCode(emailOrPhone) {
 }
 
 export async function resetPassword(emailOrPhone, code, newPassword) {
-  const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+  const base = authBase();
+  const res = await fetch(`${base}/api/auth/reset-password`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ emailOrPhone, code, newPassword })
