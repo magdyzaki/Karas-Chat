@@ -20,8 +20,9 @@ async function fetchWithRetry(url, opts = {}, { retries = 3, timeoutMs = 90000 }
 
 /** إيقاظ السيرفر عند فتح صفحة الدعوة */
 export function prewakeBackend() {
-  if (!API_BASE) return;
-  fetch(`${API_BASE}/api/health`).catch(() => {});
+  const useProxy = typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
+  const url = useProxy ? '/api/health' : `${API_BASE}/api/health`;
+  fetch(url).catch(() => {});
 }
 
 export async function searchGifs(q) {
@@ -362,7 +363,10 @@ export async function uploadFile(file) {
 }
 
 export async function consumeInviteLink(token) {
-  const res = await fetchWithRetry(`${API_BASE}/api/consume-invite/${token}`, { method: 'POST' });
+  const useProxy = typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
+  const url = useProxy ? '/api/consume-invite' : `${API_BASE}/api/consume-invite/${token}`;
+  const opts = useProxy ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) } : { method: 'POST' };
+  const res = await fetchWithRetry(url, opts);
   return res.json().catch(() => ({}));
 }
 
