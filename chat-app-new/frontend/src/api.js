@@ -18,11 +18,11 @@ async function fetchWithRetry(url, opts = {}, { retries = 3, timeoutMs = 90000 }
   throw new Error('فشل الاتصال بعد عدة محاولات');
 }
 
-/** إيقاظ السيرفر عند فتح صفحة الدعوة */
+/** إيقاظ السيرفر عند فتح صفحة الدعوة — عدة طلبات لتسريع الاستيقاظ */
 export function prewakeBackend() {
   const useProxy = typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
   const url = useProxy ? '/api/health' : `${API_BASE}/api/health`;
-  fetch(url).catch(() => {});
+  [0, 2000, 4000].forEach((d) => setTimeout(() => fetch(url).catch(() => {}), d));
 }
 
 export async function searchGifs(q) {
@@ -364,24 +364,30 @@ export async function uploadFile(file) {
 
 export async function consumeInviteLink(token) {
   const useProxy = typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
+  const proxyOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) };
+  const directOpts = { method: 'POST' };
   const tryRequest = async (url, opts) => {
     const res = await fetchWithRetry(url, opts);
     const data = await res.json().catch(() => ({}));
     return { res, data };
   };
-  // على Vercel: نستخدم Proxy فقط (نفس النطاق، لا CORS، الطلب من المتصفح إلى karas-chat.vercel.app فقط)
+  const tryOnce = async (url, opts) => {
+    try {
+      const { res, data } = await tryRequest(url, opts);
+      if (res.ok || data.ok !== undefined) return data;
+    } catch (_) {}
+    return null;
+  };
   if (useProxy) {
-    try {
-      const { res, data } = await tryRequest('/api/consume-invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
-      if (res.ok || data.ok !== undefined) return data;
-    } catch (_) {}
+    for (let i = 0; i < 3; i++) {
+      const data = await tryOnce('/api/consume-invite', proxyOpts);
+      if (data) return data;
+      if (i < 2) await new Promise((r) => setTimeout(r, 5000));
+    }
   }
-  // محلي أو عند فشل الـ proxy: طلب مباشر إلى Render
   if (API_BASE) {
-    try {
-      const { res, data } = await tryRequest(`${API_BASE}/api/consume-invite/${encodeURIComponent(token)}`, { method: 'POST' });
-      if (res.ok || data.ok !== undefined) return data;
-    } catch (_) {}
+    const data = await tryOnce(`${API_BASE}/api/consume-invite/${encodeURIComponent(token)}`, directOpts);
+    if (data) return data;
   }
   throw new Error('فشل الاتصال. تحقق من الإنترنت وحاول مرة أخرى.');
 }
