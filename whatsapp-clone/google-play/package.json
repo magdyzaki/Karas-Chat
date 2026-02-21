@@ -1,0 +1,22 @@
+{
+  "name": "karas-chat-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "بناء تطبيق أندرويد Karas شات للرفع على جوجل بلاي",
+  "scripts": {
+    "build:web": "cd ../frontend && npm run build",
+    "sync": "npm run build:web && npx cap sync android",
+    "open:android": "npx cap open android"
+  },
+  "capacitor": {
+    "platforms": ["android"]
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  },
+  "capabilities": {
+    "android": true
+  }
+}

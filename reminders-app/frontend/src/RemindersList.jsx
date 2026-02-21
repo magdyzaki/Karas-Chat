@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as api from './api';
 import ReminderForm from './ReminderForm';
 
@@ -60,6 +60,16 @@ export default function RemindersList({ user, reminders, error, isAdmin, onLogou
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [blockUserModal, setBlockUserModal] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
+  const [serverUrlInput, setServerUrlInput] = useState(() => api.getApiBase());
+
+  useEffect(() => {
+    setServerUrlInput(api.getApiBase());
+  }, [error]); // تحديث الحقل عند ظهور خطأ (مثلاً بعد إعادة المحاولة)
+
+  const handleSaveServerUrl = () => {
+    api.setApiBase(serverUrlInput);
+    if (onRefresh) onRefresh();
+  };
 
   const handleSave = async (payload) => {
     if (editing) {
@@ -193,6 +203,20 @@ export default function RemindersList({ user, reminders, error, isAdmin, onLogou
         </button>
       )}
       {error && <p style={styles.err}>{error}</p>}
+
+      <div style={{ marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
+        <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>رابط السيرفر (Backend)</label>
+        <input
+          type="url"
+          value={serverUrlInput}
+          onChange={(e) => setServerUrlInput(e.target.value)}
+          placeholder="https://your-backend.onrender.com"
+          style={{ width: '100%', padding: 10, marginBottom: 8, border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, background: 'rgba(0,0,0,0.2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }}
+        />
+        <button type="button" style={{ ...styles.btn, background: 'var(--primary)', color: '#fff' }} onClick={handleSaveServerUrl}>
+          حفظ واختبار
+        </button>
+      </div>
 
       {!showForm && !editing && (
         <button style={{ ...styles.btn, width: '100%', padding: 14, marginBottom: 20 }} onClick={() => setShowForm(true)}>

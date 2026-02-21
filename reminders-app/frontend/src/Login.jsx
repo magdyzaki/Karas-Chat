@@ -59,10 +59,16 @@ export default function Login({ onLogin }) {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [serverUrl, setServerUrl] = useState(() => api.getApiBase());
 
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    api.setApiBase(serverUrl);
+    if (!api.getApiBase()) {
+      setError('أدخل رابط السيرفر أولاً');
+      return;
+    }
     setLoading(true);
     try {
       if (mode === 'login') {
@@ -87,6 +93,16 @@ export default function Login({ onLogin }) {
           {mode === 'login' ? 'سجّل الدخول للمزامنة بين الموبايل والكمبيوتر' : 'إنشاء حساب جديد'}
         </p>
         {error && <p style={styles.err}>{error}</p>}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>رابط السيرفر (Backend)</label>
+          <input
+            type="url"
+            placeholder="https://reminders-api-8odc.onrender.com"
+            value={serverUrl}
+            onChange={(e) => setServerUrl(e.target.value)}
+            style={{ ...styles.input, marginBottom: 0, fontSize: 14 }}
+          />
+        </div>
         <form onSubmit={submit}>
           <input
             type="email"

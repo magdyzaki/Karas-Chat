@@ -77,7 +77,7 @@ export async function subscribeToPush(getVapidPublic, subscribePush) {
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     if (msg.includes('فشل جلب مفتاح') || msg.includes('fetch') || msg.includes('Network')) {
-      return { ok: false, reason: 'لا يمكن الاتصال بالسيرفر. تحقق من VITE_API_URL على Vercel (عنوان الباكند)' };
+      return { ok: false, reason: 'لا يمكن الاتصال بالسيرفر. غيّر رابط السيرفر أدناه أو تحقق من VITE_API_URL على Vercel (عنوان الباكند)' };
     }
     if (msg.includes('فشل تسجيل الاشتراك') || msg.includes('401') || msg.includes('انتهت الجلسة')) {
       return { ok: false, reason: 'انتهت الجلسة أو فشل التسجيل. سجّل دخولاً مرة أخرى' };
