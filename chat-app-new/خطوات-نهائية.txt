@@ -1,0 +1,43 @@
+═══════════════════════════════════════════════════════════
+  Karas Chat — الخطوات النهائية (بسيطة جداً)
+═══════════════════════════════════════════════════════════
+
+■ الخطوة 1 — نشر الويب (إصلاح Failed to fetch)
+────────────────────────────────────────────
+افتح PowerShell وشغّل:
+
+  cd D:\programs\Smart_CRM_Final_Arabic\chat-app-new
+  .\افعل-كل-شيء.ps1
+
+أو يدوياً:
+  cd frontend
+  npm run build
+  cd ..
+  git add .
+  git commit -m "fix"
+  git push
+
+انتظر 2–3 دقائق حتى يحدّث Vercel.
+
+■ الخطوة 2 — بناء الـ APK (اختياري)
+────────────────────────────────────────────
+1. cd D:\programs\Smart_CRM_Final_Arabic\chat-app-new\google-play
+2. npm run sync
+3. npx cap open android
+4. من Android Studio: Build → Generate Signed Bundle / APK
+5. اختر APK → Next → اختر keystore → Create
+
+الـ APK سيظهر في:
+  google-play\android\app\build\outputs\apk\release\app-release.apk
+
+■ ماذا تم إصلاحه؟
+────────────────────────────────────────────
+✓ رابط الدعوة — استهلاك على السيرفر (بدون fetch من المتصفح)
+✓ التسجيل وتسجيل الدخول — proxy عبر Vercel يتجاوز Failed to fetch
+
+■ اختبار سريع
+────────────────────────────────────────────
+1. افتح: https://karas-chat.vercel.app
+2. إنشاء حساب جديد — يفترض أن يعمل بدون خطأ
+
+═══════════════════════════════════════════════════════════
