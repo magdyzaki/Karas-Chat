@@ -1,7 +1,7 @@
 name: Keep Render Awake
 on:
   schedule:
-    - cron: '*/10 * * * *'   # كل 10 دقائق
+    - cron: '*/5 * * * *'   # كل 10 دقائق
   workflow_dispatch:          # تشغيل يدوي
 jobs:
   ping:
