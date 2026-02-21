@@ -1,8 +1,31 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 /** عند الويب: استخدم proxy على Vercel لتجاوز Failed to fetch مع Render */
-const useAuthProxy = () => typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
+const useApiProxy = () => typeof window !== 'undefined' && window.location?.hostname !== 'localhost';
+const useAuthProxy = useApiProxy;
 const authBase = () => (useAuthProxy() ? '' : API_BASE);
+
+/** طلب API — عند الويب يمر عبر proxy لتجاوز CORS و Render cold start */
+async function apiFetch(path, opts = {}) {
+  const url = (API_BASE || '') + (path.startsWith('/') ? path : '/' + path);
+  if (useApiProxy()) {
+    const pathStr = path.startsWith('/') ? path : '/' + path;
+    let body = opts.body;
+    if (typeof body === 'string') try { body = JSON.parse(body); } catch (_) {}
+    const r = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: pathStr,
+        method: opts.method || 'GET',
+        body,
+        headers: opts.headers || {}
+      })
+    });
+    return r;
+  }
+  return fetch(url, opts);
+}
 
 /** يستخدم للطلبات الأولى عند استيقاظ السيرفر (Render cold start) */
 async function fetchWithRetry(url, opts = {}, { retries = 3, timeoutMs = 90000 } = {}) {
@@ -30,14 +53,14 @@ export function prewakeBackend() {
 }
 
 export async function searchGifs(q) {
-  const res = await fetch(`${API_BASE}/api/giphy/search?q=${encodeURIComponent(q || '')}`, { headers: headers() });
+  const res = await apiFetch(`/api/giphy/search?q=${encodeURIComponent(q || '')}`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل بحث GIF');
   return data.gifs || [];
 }
 
 export async function getTrendingGifs() {
-  const res = await fetch(`${API_BASE}/api/giphy/trending`, { headers: headers() });
+  const res = await apiFetch(`/api/giphy/trending`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل تحميل GIF');
   return data.gifs || [];
@@ -112,7 +135,7 @@ export async function forgotPassword(emailOrPhone) {
 
 export async function getDevLastCode(emailOrPhone) {
   const q = encodeURIComponent(String(emailOrPhone || '').trim());
-  const res = await fetch(`${API_BASE}/api/dev/last-code?q=${q}`);
+  const res = await apiFetch(`/api/dev/last-code?q=${q}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل');
   return data;
@@ -132,7 +155,7 @@ export async function resetPassword(emailOrPhone, code, newPassword) {
 
 export async function checkContacts(phoneNumbers) {
   const arr = Array.isArray(phoneNumbers) ? phoneNumbers : [phoneNumbers];
-  const res = await fetch(`${API_BASE}/api/users/check-contacts`, {
+  const res = await apiFetch(`/api/users/check-contacts`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ phoneNumbers: arr })
@@ -143,79 +166,79 @@ export async function checkContacts(phoneNumbers) {
 }
 
 export async function getUsers() {
-  const res = await fetch(`${API_BASE}/api/users`, { headers: headers() });
+  const res = await apiFetch(`/api/users`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب المستخدمين');
   return data.users || [];
 }
 
 export async function getAdminUsers() {
-  const res = await fetch(`${API_BASE}/api/admin/users`, { headers: headers() });
+  const res = await apiFetch(`/api/admin/users`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب المستخدمين');
   return data.users || [];
 }
 
 export async function getConversations() {
-  const res = await fetch(`${API_BASE}/api/conversations`, { headers: headers() });
+  const res = await apiFetch(`/api/conversations`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب المحادثات');
   return data.conversations || [];
 }
 
 export async function getConversation(id) {
-  const res = await fetch(`${API_BASE}/api/conversations/${id}`, { headers: headers() });
+  const res = await apiFetch(`/api/conversations/${id}`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب المحادثة');
   return data;
 }
 
 export async function getMessages(conversationId, limit = 100, before = null) {
-  let url = `${API_BASE}/api/conversations/${conversationId}/messages?limit=${limit}`;
-  if (before) url += `&before=${before}`;
-  const res = await fetch(url, { headers: headers() });
+  let path = `/api/conversations/${conversationId}/messages?limit=${limit}`;
+  if (before) path += `&before=${before}`;
+  const res = await apiFetch(path, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب الرسائل');
   return { messages: data.messages || [], readReceipts: data.readReceipts || [], reactions: data.reactions || [] };
 }
 
 export async function muteConversation(conversationId) {
-  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/mute`, { method: 'PATCH', headers: headers() });
+  const res = await apiFetch(`/api/conversations/${conversationId}/mute`, { method: 'PATCH', headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل كتم المحادثة');
   return data;
 }
 
 export async function unmuteConversation(conversationId) {
-  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/unmute`, { method: 'PATCH', headers: headers() });
+  const res = await apiFetch(`/api/conversations/${conversationId}/unmute`, { method: 'PATCH', headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل إلغاء كتم المحادثة');
   return data;
 }
 
 export async function archiveConversation(conversationId) {
-  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/archive`, { method: 'PATCH', headers: headers() });
+  const res = await apiFetch(`/api/conversations/${conversationId}/archive`, { method: 'PATCH', headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل أرشفة المحادثة');
   return data;
 }
 
 export async function unarchiveConversation(conversationId) {
-  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/unarchive`, { method: 'PATCH', headers: headers() });
+  const res = await apiFetch(`/api/conversations/${conversationId}/unarchive`, { method: 'PATCH', headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل إلغاء أرشفة المحادثة');
   return data;
 }
 
 export async function getStories() {
-  const res = await fetch(`${API_BASE}/api/stories`, { headers: headers() });
+  const res = await apiFetch(`/api/stories`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب القصص');
   return data.feed || [];
 }
 
 export async function createStory(type, content, file_name = null) {
-  const res = await fetch(`${API_BASE}/api/stories`, {
+  const res = await apiFetch(`/api/stories`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ type, content, file_name })
@@ -226,7 +249,7 @@ export async function createStory(type, content, file_name = null) {
 }
 
 export async function setDisappearing(conversationId, seconds) {
-  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/disappearing`, {
+  const res = await apiFetch(`/api/conversations/${conversationId}/disappearing`, {
     method: 'PATCH',
     headers: headers(),
     body: JSON.stringify({ seconds })
@@ -237,7 +260,7 @@ export async function setDisappearing(conversationId, seconds) {
 }
 
 export async function votePoll(conversationId, messageId, optionIndex) {
-  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/messages/${messageId}/vote`, {
+  const res = await apiFetch(`/api/conversations/${conversationId}/messages/${messageId}/vote`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ optionIndex })
@@ -248,7 +271,7 @@ export async function votePoll(conversationId, messageId, optionIndex) {
 }
 
 export async function exportBackup() {
-  const res = await fetch(`${API_BASE}/api/backup/export`, { headers: headers() });
+  const res = await apiFetch(`/api/backup/export`, { headers: headers() });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || 'فشل تصدير النسخة الاحتياطية');
@@ -258,7 +281,7 @@ export async function exportBackup() {
 }
 
 export async function forwardMessage(targetConversationId, fromConversationId, messageId) {
-  const res = await fetch(`${API_BASE}/api/conversations/${targetConversationId}/forward`, {
+  const res = await apiFetch(`/api/conversations/${targetConversationId}/forward`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ fromConversationId, messageId })
@@ -269,7 +292,7 @@ export async function forwardMessage(targetConversationId, fromConversationId, m
 }
 
 export async function createDirectConversation(otherUserId) {
-  const res = await fetch(`${API_BASE}/api/conversations/direct`, {
+  const res = await apiFetch(`/api/conversations/direct`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ otherUserId })
@@ -280,7 +303,7 @@ export async function createDirectConversation(otherUserId) {
 }
 
 export async function createGroupConversation(name, memberIds) {
-  const res = await fetch(`${API_BASE}/api/conversations/group`, {
+  const res = await apiFetch(`/api/conversations/group`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ name, memberIds })
@@ -291,7 +314,7 @@ export async function createGroupConversation(name, memberIds) {
 }
 
 export async function addMemberToGroup(conversationId, targetUserId) {
-  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/add-member`, {
+  const res = await apiFetch(`/api/conversations/${conversationId}/add-member`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ targetUserId })
@@ -302,7 +325,7 @@ export async function addMemberToGroup(conversationId, targetUserId) {
 }
 
 export async function removeMemberFromGroup(conversationId, targetUserId) {
-  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/remove-member`, {
+  const res = await apiFetch(`/api/conversations/${conversationId}/remove-member`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ targetUserId })
@@ -313,14 +336,14 @@ export async function removeMemberFromGroup(conversationId, targetUserId) {
 }
 
 export async function getBroadcastLists() {
-  const res = await fetch(`${API_BASE}/api/broadcast`, { headers: headers() });
+  const res = await apiFetch(`/api/broadcast`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب القوائم');
   return data.lists || [];
 }
 
 export async function createBroadcastList(name, recipientIds) {
-  const res = await fetch(`${API_BASE}/api/broadcast`, {
+  const res = await apiFetch(`/api/broadcast`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ name, recipientIds })
@@ -331,7 +354,7 @@ export async function createBroadcastList(name, recipientIds) {
 }
 
 export async function updateBroadcastList(id, { name, recipientIds }) {
-  const res = await fetch(`${API_BASE}/api/broadcast/${id}`, {
+  const res = await apiFetch(`/api/broadcast/${id}`, {
     method: 'PATCH',
     headers: headers(),
     body: JSON.stringify({ name, recipientIds })
@@ -342,14 +365,14 @@ export async function updateBroadcastList(id, { name, recipientIds }) {
 }
 
 export async function deleteBroadcastList(id) {
-  const res = await fetch(`${API_BASE}/api/broadcast/${id}`, { method: 'DELETE', headers: headers() });
+  const res = await apiFetch(`/api/broadcast/${id}`, { method: 'DELETE', headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل الحذف');
   return data;
 }
 
 export async function sendBroadcastMessage(listId, { type = 'text', content, file_name }) {
-  const res = await fetch(`${API_BASE}/api/broadcast/${listId}/send`, {
+  const res = await apiFetch(`/api/broadcast/${listId}/send`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ type, content, file_name })
@@ -362,7 +385,7 @@ export async function sendBroadcastMessage(listId, { type = 'text', content, fil
 export async function uploadFile(file) {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${API_BASE}/api/upload`, {
+  const res = await apiFetch(`/api/upload`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },
     body: form
@@ -403,14 +426,14 @@ export async function consumeInviteLink(token) {
 }
 
 export async function createInviteLink() {
-  const res = await fetch(`${API_BASE}/api/invite-links`, { method: 'POST', headers: headers() });
+  const res = await apiFetch(`/api/invite-links`, { method: 'POST', headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل إنشاء الرابط');
   return data;
 }
 
 export async function blockUser(targetUserId) {
-  const res = await fetch(`${API_BASE}/api/admin/block-user`, {
+  const res = await apiFetch(`/api/admin/block-user`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ targetUserId })
@@ -421,7 +444,7 @@ export async function blockUser(targetUserId) {
 }
 
 export async function unblockUser(targetUserId) {
-  const res = await fetch(`${API_BASE}/api/admin/unblock-user`, {
+  const res = await apiFetch(`/api/admin/unblock-user`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ targetUserId })
@@ -432,14 +455,14 @@ export async function unblockUser(targetUserId) {
 }
 
 export async function getPendingUsers() {
-  const res = await fetch(`${API_BASE}/api/admin/pending-users`, { headers: headers() });
+  const res = await apiFetch(`/api/admin/pending-users`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل');
   return data;
 }
 
 export async function approveUser(targetUserId) {
-  const res = await fetch(`${API_BASE}/api/admin/approve-user`, {
+  const res = await apiFetch(`/api/admin/approve-user`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ targetUserId })
@@ -450,28 +473,28 @@ export async function approveUser(targetUserId) {
 }
 
 export async function getPendingCodes() {
-  const res = await fetch(`${API_BASE}/api/admin/pending-codes`, { headers: headers() });
+  const res = await apiFetch(`/api/admin/pending-codes`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل');
   return data;
 }
 
 export async function getBlockedUsers() {
-  const res = await fetch(`${API_BASE}/api/admin/blocked-users`, { headers: headers() });
+  const res = await apiFetch(`/api/admin/blocked-users`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب القائمة');
   return data.users || [];
 }
 
 export async function resetDatabase() {
-  const res = await fetch(`${API_BASE}/api/admin/reset-database`, { method: 'POST' });
+  const res = await apiFetch(`/api/admin/reset-database`, { method: 'POST' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل إعادة التعيين');
   return data;
 }
 
 export async function setMyE2EPublicKey(publicKey) {
-  const res = await fetch(`${API_BASE}/api/users/me/e2e-key`, {
+  const res = await apiFetch(`/api/users/me/e2e-key`, {
     method: 'PUT',
     headers: headers(),
     body: JSON.stringify({ publicKey })
@@ -482,14 +505,14 @@ export async function setMyE2EPublicKey(publicKey) {
 }
 
 export async function getUserE2EPublicKey(userId) {
-  const res = await fetch(`${API_BASE}/api/users/${userId}/e2e-key`, { headers: headers() });
+  const res = await apiFetch(`/api/users/${userId}/e2e-key`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) return null;
   return data.publicKey || null;
 }
 
 export async function getMe() {
-  const res = await fetch(`${API_BASE}/api/users/me`, { headers: headers() });
+  const res = await apiFetch(`/api/users/me`, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل');
   return data;
@@ -498,7 +521,7 @@ export async function getMe() {
 export async function uploadAvatar(file) {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${API_BASE}/api/upload-avatar`, {
+  const res = await apiFetch(`/api/upload-avatar`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },
     body: form
@@ -515,7 +538,7 @@ export function uploadsUrl(path) {
 }
 
 export async function subscribePush(subscription) {
-  const res = await fetch(`${API_BASE}/api/push/subscribe`, {
+  const res = await apiFetch(`/api/push/subscribe`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ subscription })
