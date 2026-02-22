@@ -1,0 +1,28 @@
+{
+  "name": "chat-app-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "predev": "npx --yes kill-port 5002",
+    "dev": "nodemon --exec \"node --env-file=.env\" --delay 1 index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "lowdb": "^7.0.1",
+    "multer": "^2.0.2",
+    "pg": "^8.18.0",
+    "socket.io": "^4.7.4",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
