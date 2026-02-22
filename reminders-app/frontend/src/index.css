@@ -1,0 +1,31 @@
+* {
+  box-sizing: border-box;
+}
+:root {
+  --bg: #0f2e26;
+  --surface: #1a3d32;
+  --primary: #2d9d78;
+  --primary-light: #3db88a;
+  --text: #e8f5f0;
+  --text-muted: #8fb8a8;
+  --danger: #c75c5c;
+  --radius: 12px;
+}
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'Cairo', Tahoma, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+#root {
+  min-height: 100vh;
+}
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+input, textarea {
+  font-family: inherit;
+}

@@ -1,0 +1,22 @@
+# Render Blueprint - Karas شات Backend
+# استخدم هذا الملف للنشر التلقائي على Render
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: karas-chat-backend
+    runtime: node
+    rootDir: backend
+
+    buildCommand: npm install
+    startCommand: npm start
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APPROVAL_MODE
+        value: "true"
+      # أضف TRUSTED_PHONES في Render Dashboard إذا احتجت
+      # أضف VAPID keys إذا استخدمت الإشعارات

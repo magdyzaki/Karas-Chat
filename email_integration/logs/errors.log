@@ -1,0 +1,70 @@
+2026-01-28 10:40:36 - EFM_Error - ERROR - [Outlook Sync] Outlook sync error: table messages has no column named message_type
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\main_window.py", line 1113, in sync_outlook
+    add_message({
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\core\db.py", line 602, in add_message
+sqlite3.OperationalError: table messages has no column named message_type
+2026-01-28 10:43:30 - EFM_Error - ERROR - [Sync] Error syncing magdyb2000@hotmail.com: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\sync_window.py", line 379, in sync_selected
+    messages = read_messages_from_folder(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+2026-01-28 10:53:19 - EFM_Error - ERROR - [Sync] Error syncing magdyb2000@hotmail.com: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\sync_window.py", line 379, in sync_selected
+    messages = read_messages_from_folder(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+2026-01-28 11:02:27 - EFM_Error - ERROR - [Sync] Error syncing magdyb2000@hotmail.com: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\sync_window.py", line 379, in sync_selected
+    messages = read_messages_from_folder(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+2026-01-28 11:15:48 - EFM_Error - ERROR - [Sync] Error syncing stephanie.triebskorn@tro-kost.de: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\sync_window.py", line 379, in sync_selected
+    messages = read_messages_from_folder(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+2026-01-28 14:45:52 - EFM_Error - ERROR - [Focus Messages Check] Error checking focus messages: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\main_window.py", line 1977, in check_focus_messages
+    messages = read_new_messages_from_inbox(self.graph_token, top=20)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\core\ms_mail_reader.py", line 198, in read_new_messages_from_inbox
+    r.raise_for_status()
+  File "C:\Users\fg\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+2026-01-28 15:00:52 - EFM_Error - ERROR - [Focus Messages Check] Error checking focus messages: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\main_window.py", line 1977, in check_focus_messages
+    messages = read_new_messages_from_inbox(self.graph_token, top=20)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\core\ms_mail_reader.py", line 198, in read_new_messages_from_inbox
+    r.raise_for_status()
+  File "C:\Users\fg\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+2026-01-28 15:15:51 - EFM_Error - ERROR - [Focus Messages Check] Error checking focus messages: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\main_window.py", line 1977, in check_focus_messages
+    messages = read_new_messages_from_inbox(self.graph_token, top=20)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\core\ms_mail_reader.py", line 198, in read_new_messages_from_inbox
+    r.raise_for_status()
+  File "C:\Users\fg\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+2026-01-28 15:30:52 - EFM_Error - ERROR - [Focus Messages Check] Error checking focus messages: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+Traceback (most recent call last):
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\ui\main_window.py", line 1977, in check_focus_messages
+    messages = read_new_messages_from_inbox(self.graph_token, top=20)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\programs\Smart_CRM_Final_Arabic\pages\..\email_integration\core\ms_mail_reader.py", line 198, in read_new_messages_from_inbox
+    r.raise_for_status()
+  File "C:\Users\fg\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc

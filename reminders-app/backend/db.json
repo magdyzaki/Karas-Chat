@@ -1,0 +1,23 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "email": "contact@el-raee.com",
+      "password_hash": "$2a$10$a85FeLXwuDr00iNyMP7KEu51P96dyYgT1hNHUJU3/fuEOaFWgbS.m",
+      "name": "Magdy Zaki",
+      "created_at": "2026-02-07T08:44:23.982Z"
+    }
+  ],
+  "reminders": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "title": "تحية لدكتور ملاك",
+      "body": "صباح الخير يا دكتور ملاك.\nكيف حالك اليوم؟\nاذكرك ان اليوم هو السبت اول ايام  الاسبوع",
+      "remind_at": "2026-02-07T08:48:00.000Z",
+      "repeat": null,
+      "created_at": "2026-02-07T08:46:40.252Z"
+    }
+  ],
+  "push_subscriptions": []
+}

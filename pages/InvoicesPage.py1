@@ -1,0 +1,440 @@
+# ===== START PART 1 =====
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QLabel, QHBoxLayout, QLineEdit, QPushButton,
+    QComboBox, QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog, QInputDialog
+)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, QDateTime
+import sqlite3, os
+from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from num2words import num2words
+
+
+class InvoicesPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("background-color: #FFFDF5;")
+        self.invoice_items = []
+        self.db_path = os.path.join(os.path.dirname(__file__), "..", "database", "crm.db")
+        self.save_folder = os.path.join(os.path.dirname(__file__), "..", "exports", "invoices")
+        os.makedirs(self.save_folder, exist_ok=True)
+        self.payment_terms = ""
+        self.bank_details = ""
+        self.seller_info = ""
+        self.customer_data = {}
+        self.init_ui()
+        self.load_sales_list()
+
+    # ==================== UI ====================
+    def init_ui(self):
+        main = QVBoxLayout()
+
+        title = QLabel("🧾 Invoices Management")
+        title.setFont(QFont("Amiri", 18, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        main.addWidget(title)
+
+        # ===== الصف العلوي =====
+        top_row = QHBoxLayout()
+        self.invoice_number_input = QLineEdit()
+        self.invoice_number_input.setPlaceholderText("Invoice No (manual)")
+        self.save_folder_btn = QPushButton("Choose Save Folder")
+        self.save_folder_btn.clicked.connect(self.choose_save_folder)
+        top_row.addWidget(QLabel("Invoice No:"))
+        top_row.addWidget(self.invoice_number_input)
+        top_row.addWidget(self.save_folder_btn)
+        main.addLayout(top_row)
+
+        # ===== تحميل المبيعات =====
+        import_row = QHBoxLayout()
+        self.sales_combo = QComboBox()
+        self.reload_sales_button = QPushButton("Load Sales")
+        self.reload_sales_button.clicked.connect(self.load_sales_list)
+        self.add_sale_btn = QPushButton("Add Sale to Invoice")
+        self.add_sale_btn.clicked.connect(self.add_selected_sale_to_invoice)
+        import_row.addWidget(QLabel("Import from Sales:"))
+        import_row.addWidget(self.sales_combo)
+        import_row.addWidget(self.reload_sales_button)
+        import_row.addWidget(self.add_sale_btn)
+        main.addLayout(import_row)
+# ===== END PART 1 =====
+
+
+# ===== START PART 2 =====
+
+        # ===== جدول العناصر =====
+        self.table = QTableWidget()
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels([
+            "Sale ID", "Customer", "Code", "Product", "Unit", "Qty", "Price", "Total (USD)"
+        ])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        main.addWidget(self.table)
+
+        # ===== أزرار التحكم =====
+        buttons_row = QHBoxLayout()
+        self.remove_item_btn = QPushButton("Remove Item")
+        self.clear_items_btn = QPushButton("Clear Items")
+        self.preview_btn = QPushButton("Preview Invoice")
+        self.export_word_btn = QPushButton("Export Word")
+
+        self.remove_item_btn.clicked.connect(self.remove_selected_item)
+        self.clear_items_btn.clicked.connect(self.clear_items)
+        self.preview_btn.clicked.connect(self.preview_invoice)
+        self.export_word_btn.clicked.connect(self.export_word)
+
+        for btn, color in [
+            (self.remove_item_btn, "#E53935"),
+            (self.clear_items_btn, "#9C27B0"),
+            (self.preview_btn, "#03A9F4"),
+            (self.export_word_btn, "#2196F3"),
+        ]:
+            btn.setStyleSheet(f"background-color:{color};color:white;")
+            btn.setFont(QFont("Amiri", 12, QFont.Bold))
+            btn.setFixedHeight(40)
+            buttons_row.addWidget(btn)
+        main.addLayout(buttons_row)
+
+        # ===== المجموع الكلي =====
+        summary_row = QHBoxLayout()
+        self.total_label = QLabel("Total: 0.00 USD")
+        self.total_label.setFont(QFont("Amiri", 14, QFont.Bold))
+        summary_row.addStretch()
+        summary_row.addWidget(self.total_label)
+        main.addLayout(summary_row)
+
+        # ===== إعدادات الفاتورة =====
+        settings_row = QHBoxLayout()
+        self.payment_terms_btn = QPushButton("Payment Terms (edit)")
+        self.payment_terms_btn.clicked.connect(self.edit_payment_terms)
+        self.bank_details_btn = QPushButton("Bank Details (edit)")
+        self.bank_details_btn.clicked.connect(self.edit_bank_details)
+        self.seller_info_btn = QPushButton("Seller Info (edit)")
+        self.seller_info_btn.clicked.connect(self.edit_seller_info)
+        settings_row.addWidget(self.payment_terms_btn)
+        settings_row.addWidget(self.bank_details_btn)
+        settings_row.addWidget(self.seller_info_btn)
+        main.addLayout(settings_row)
+
+        self.setLayout(main)
+
+# ===== END PART 2 =====
+
+
+# ===== START PART 3 =====
+
+    # ==================== Database ====================
+    def db_conn(self):
+        return sqlite3.connect(self.db_path)
+
+    def choose_save_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Choose Save Folder", self.save_folder)
+        if folder:
+            self.save_folder = folder
+
+    def load_sales_list(self):
+        try:
+            self.sales_combo.clear()
+            conn = self.db_conn()
+            cur = conn.cursor()
+            cur.execute("SELECT id, customer_name, product_name, sale_date FROM sales ORDER BY id DESC")
+            rows = cur.fetchall()
+            if not rows:
+                self.sales_combo.addItem("No sales found", None)
+            else:
+                for r in rows:
+                    self.sales_combo.addItem(f"{r[0]} | {r[1]} | {r[2]} | {r[3]}", r[0])
+            conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load sales:\n{e}")
+
+    # ==================== Invoice Logic ====================
+    def add_selected_sale_to_invoice(self):
+        sale_id = self.sales_combo.currentData()
+        if not sale_id:
+            QMessageBox.warning(self, "Warning", "Choose a sale first.")
+            return
+        try:
+            conn = self.db_conn()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, customer_name, 
+                       COALESCE(customer_address, '———'), 
+                       COALESCE(customer_phone, '———'),
+                       product_code, product_name, unit, quantity, price_usd
+                FROM sales WHERE id=?
+            """, (sale_id,))
+            row = cur.fetchone()
+            conn.close()
+            if not row:
+                return
+
+            sid, cust_name, cust_addr, cust_phone, code, pname, unit, qty, price = row
+            total = round(float(qty) * float(price), 2)
+            self.invoice_items.append({
+                "sale_id": sid, "customer_name": cust_name, "product_code": code,
+                "product_name": pname, "unit": unit, "quantity": float(qty),
+                "price": float(price), "total": total
+            })
+            self.customer_data = {
+                "name": cust_name,
+                "address": cust_addr,
+                "phone": cust_phone
+            }
+            self.refresh_invoice_table()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Add failed:\n{e}")
+
+    def refresh_invoice_table(self):
+        self.table.setRowCount(0)
+        for it in self.invoice_items:
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+            for i, val in enumerate([
+                it.get("sale_id"), it.get("customer_name"), it.get("product_code"),
+                it.get("product_name"), it.get("unit"), it.get("quantity"),
+                self.format_money(it.get("price")), self.format_money(it.get("total"))
+            ]):
+                item = QTableWidgetItem(str(val))
+                item.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(r, i, item)
+        self.update_totals()
+
+    def remove_selected_item(self):
+        row = self.table.currentRow()
+        if row >= 0:
+            del self.invoice_items[row]
+            self.refresh_invoice_table()
+
+    def clear_items(self):
+        self.invoice_items = []
+        self.refresh_invoice_table()
+
+    def update_totals(self):
+        total = sum(it["total"] for it in self.invoice_items)
+        self.total_label.setText(f"Total: {total:.2f} USD")
+
+    def format_money(self, val):
+        try:
+            return f"{float(val):.2f}"
+        except:
+            return str(val)
+
+# ===== END PART 3 =====
+
+
+# ===== START PART 4 =====
+
+    # ==================== Settings ====================
+    def load_settings(self):
+        try:
+            conn = self.db_conn()
+            cur = conn.cursor()
+            keys = ["payment_terms", "bank_details", "seller_info"]
+            for key in keys:
+                cur.execute("SELECT value FROM settings WHERE key=?", (key,))
+                row = cur.fetchone()
+                setattr(self, key, row[0] if row else "")
+            conn.close()
+        except:
+            pass
+
+    def save_setting(self, key, val):
+        conn = self.db_conn()
+        cur = conn.cursor()
+        cur.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, val))
+        conn.commit()
+        conn.close()
+
+    def edit_payment_terms(self):
+        txt, ok = QInputDialog.getMultiLineText(self, "Edit Payment Terms", "Enter payment terms:", self.payment_terms)
+        if ok:
+            self.payment_terms = txt
+            self.save_setting("payment_terms", txt)
+
+    def edit_bank_details(self):
+        txt, ok = QInputDialog.getMultiLineText(self, "Edit Bank Details", "Enter bank details:", self.bank_details)
+        if ok:
+            self.bank_details = txt
+            self.save_setting("bank_details", txt)
+
+    def edit_seller_info(self):
+        txt, ok = QInputDialog.getMultiLineText(self, "Edit Seller Info", "Enter seller info:", self.seller_info)
+        if ok:
+            self.seller_info = txt
+            self.save_setting("seller_info", txt)
+
+# ===== END PART 4 =====
+
+
+# ===== START PART 5 =====
+
+    # ==================== Word Export ====================
+    def preview_invoice(self):
+        self.generate_invoice_word(preview=True)
+
+    def export_word(self):
+        self.generate_invoice_word(preview=False)
+
+    def generate_invoice_word(self, preview=False):
+        if not self.invoice_items:
+            QMessageBox.warning(self, "Warning", "No items to export.")
+            return
+
+        try:
+            invoice_no = self.invoice_number_input.text() or QDateTime.currentDateTime().toString("yyyyMMddHHmmss")
+            folder = os.path.join(self.save_folder, "preview" if preview else "")
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, f"invoice_{invoice_no}.docx")
+
+            doc = Document()
+            style = doc.styles['Normal']
+            style.font.name = "Times New Roman"
+            style.font.size = Pt(12)
+
+            section = doc.sections[0]
+            section.top_margin = Inches(1.6)
+            section.left_margin = Inches(1.1)
+            section.right_margin = Inches(1.1)
+
+            # ===== HEADER =====
+            p = doc.add_paragraph(f"INVOICE NO {invoice_no}")
+            run = p.runs[0]
+            run.bold = True
+            run.font.size = Pt(16)
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            doc.add_paragraph("")
+
+            left_info = [
+                f"Date: {QDateTime.currentDateTime().toString('yyyy-MM-dd')}",
+                f"TO: {self.customer_data.get('name', '———')}",
+                f"ADDRESS: {self.customer_data.get('address', '———')}",
+                f"TEL NO: {self.customer_data.get('phone', '———')}"
+            ]
+            for line in left_info:
+                p = doc.add_paragraph(line)
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+            doc.add_paragraph("")
+
+            # ===== SELLER INFO =====
+            seller_lines = self.seller_info.split("\n") if self.seller_info else [
+                "Seller:",
+                "ELRAEE FOR DEHYDRATION",
+                "Plot No. 107, Light Industry Zone, New Beni Suef, Egypt",
+                "Tel: +20 122 908 4204"
+            ]
+            for line in seller_lines:
+                p = doc.add_paragraph(line)
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+            doc.add_paragraph("")
+
+            # ===== MAIN TABLE =====
+            table = doc.add_table(rows=1, cols=4)
+            table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            table.autofit = False
+
+            widths = [Inches(3.8), Inches(0.8), Inches(0.85), Inches(0.85)]
+            for i, width in enumerate(widths):
+                for cell in table.columns[i].cells:
+                    cell.width = width
+
+            headers = ["DESCRIPTION", "QTY", "PRICE", "USD"]
+            for i, h in enumerate(headers):
+                cell = table.rows[0].cells[i]
+                cell.text = h
+                p = cell.paragraphs[0]
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.runs[0].bold = True
+                p.runs[0].font.size = Pt(12)
+
+            total_sum = 0
+            total_qty = 0
+
+            for it in self.invoice_items:
+                row = table.add_row().cells
+                row[0].text = str(it["product_name"])
+                row[1].text = str(int(it["quantity"]))
+                row[2].text = self.format_money(it["price"])
+                row[3].text = self.format_money(it["total"])
+                total_sum += it["total"]
+                total_qty += it["quantity"]
+
+            # Convert totals to words
+            total_words = num2words(total_sum, to='cardinal', lang='en').title() + " Dollars Only"
+            qty_words = num2words(total_qty, to='cardinal', lang='en').title() + " KGS Only"
+
+            # Add total rows
+            total_row = table.add_row().cells
+            total_row[0].text = total_words
+            total_row[1].text = "———"
+            total_row[2].text = "———"
+            total_row[3].text = f"{self.format_money(total_sum)}"
+
+            qty_row = table.add_row().cells
+            qty_row[0].text = qty_words
+            qty_row[1].text = str(int(total_qty))
+            qty_row[2].text = "———"
+            qty_row[3].text = "———"
+
+            # ===== Force table column widths =====
+            for row in table.rows:
+                for i, width in enumerate(widths):
+                    cell = row.cells[i]
+                    tc = cell._tc
+                    tcPr = tc.get_or_add_tcPr()
+                    tcW = OxmlElement('w:tcW')
+                    tcW.set(qn('w:w'), str(int(width.inches * 1440)))
+                    tcW.set(qn('w:type'), 'dxa')
+                    tcPr.append(tcW)
+
+            # ===== Apply borders =====
+            for row in table.rows:
+                for cell in row.cells:
+                    tc = cell._tc
+                    tcPr = tc.get_or_add_tcPr()
+                    tcBorders = OxmlElement('w:tcBorders')
+                    for border_name in ('top', 'left', 'bottom', 'right'):
+                        border_el = OxmlElement(f'w:{border_name}')
+                        border_el.set(qn('w:val'), 'single')
+                        border_el.set(qn('w:sz'), '8')
+                        border_el.set(qn('w:space'), '0')
+                        border_el.set(qn('w:color'), '000000')
+                        tcBorders.append(border_el)
+                    tcPr.append(tcBorders)
+
+            doc.add_paragraph("")
+
+            # ===== TERMS =====
+            terms = doc.add_paragraph()
+            terms.add_run("Terms of Payment ").bold = True
+            terms.add_run(self.payment_terms or
+                "70% Cash Against Documents on first presentation.\n30% after arrival and approval of goods.")
+            doc.add_paragraph("")
+
+            # ===== BANK DETAILS =====
+            doc.add_paragraph("Bank Details:").runs[0].bold = True
+            doc.add_paragraph(self.bank_details or
+                "Bank Name: EXPORT DEVELOPMENT BANK OF EGYPT\n"
+                "Account Holder's Name: ELRAEE FOR DEHYDRATION\n"
+                "Account Number: 2020273697801029\n"
+                "IBAN: EG7400615611020273697801029\n"
+                "Swift Code: EXDEEGCX"
+            )
+
+            doc.save(path)
+            if preview:
+                os.startfile(path)
+            else:
+                QMessageBox.information(self, "Done", f"Saved Word: {os.path.basename(path)}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to create Word:\n{e}")
+
+# ===== END PART 5 =====

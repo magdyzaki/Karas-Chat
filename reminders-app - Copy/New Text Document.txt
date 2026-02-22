@@ -1,0 +1,5 @@
+
+لتفعيل التنبيه مع الشاشة مطفية، ضع في Environment Variables:
+VAPID_PUBLIC_KEY= BEd2Bg0zB04uukhs-4e342Fz0MtAmzvMKMKjvXkp-eFFmbKJvdiglPEmcKhc9hZNL9nzBOlssAKusxdayRxKhyc
+VAPID_PRIVATE_KEY= 3zFKmnC1Dw8DHG309TWVA1IqwAmBeFJEoModo9b-Xd0
+سيرفر التنبيهات يعمل على المنفذ 4000

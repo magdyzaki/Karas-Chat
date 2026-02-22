@@ -75,8 +75,10 @@ router.post('/register', async (req, res) => {
   const { emailOrPhone, password, name, inviteToken } = req.body || {};
   if (!emailOrPhone || !password) return res.status(400).json({ error: 'البريد أو رقم الموبايل وكلمة المرور مطلوبان' });
 
-  // في وضع الدعوة فقط: يجب وجود رمز دعوة صالح
-  if (INVITE_ONLY) {
+  const { email, phone } = parseEmailOrPhone(emailOrPhone);
+
+  // في وضع الدعوة فقط: يجب وجود رمز دعوة صالح — إلا إذا الرقم من TRUSTED_PHONES (استثناء للأدمن)
+  if (INVITE_ONLY && !(phone && isTrustedPhone(phone))) {
     const token = String(inviteToken || '').trim();
     if (!token) return res.status(403).json({ error: 'تحتاج رمز دعوة للتسجيل. اطلب الرابط من المسؤول.' });
     const link = await db.getInviteLink(token);
@@ -87,7 +89,6 @@ router.post('/register', async (req, res) => {
     if (link.used_at) return res.status(403).json({ error: 'تم استخدام رمز الدعوة مسبقاً.' });
   }
 
-  const { email, phone } = parseEmailOrPhone(emailOrPhone);
   if (!email && !phone) return res.status(400).json({ error: 'أدخل بريداً إلكترونياً صحيحاً أو رقم موبايل (10 أرقام على الأقل)' });
   if (email && db.findUserByEmail(email)) return res.status(400).json({ error: 'البريد مستخدم مسبقاً' });
   if (phone && db.findUserByPhone(phone)) return res.status(400).json({ error: 'رقم الموبايل مستخدم مسبقاً' });

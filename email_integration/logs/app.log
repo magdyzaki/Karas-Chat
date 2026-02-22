@@ -1,0 +1,104 @@
+2026-01-28 01:50:15 - INFO - [Backup] Startup backup created
+2026-01-28 01:53:06 - INFO - Theme changed to dark
+2026-01-28 01:53:13 - INFO - Theme changed to light
+2026-01-28 01:56:17 - INFO - [Backup] Startup backup created
+2026-01-28 01:56:21 - INFO - Theme changed to dark
+2026-01-28 01:57:14 - INFO - [Backup] Startup backup created
+2026-01-28 01:57:24 - INFO - Theme changed to light
+2026-01-28 01:57:28 - INFO - Theme changed to dark
+2026-01-28 01:57:37 - INFO - Theme changed to light
+2026-01-28 02:00:37 - INFO - [Backup] Startup backup created
+2026-01-28 02:00:43 - INFO - Theme changed to dark
+2026-01-28 02:00:58 - INFO - Theme changed to light
+2026-01-28 02:01:08 - INFO - Theme changed to dark
+2026-01-28 02:04:18 - INFO - [Backup] Startup backup created
+2026-01-28 02:04:26 - INFO - Theme changed to light
+2026-01-28 02:04:30 - INFO - Theme changed to dark
+2026-01-28 02:07:23 - INFO - [Backup] Startup backup created
+2026-01-28 02:07:32 - INFO - Theme changed to light
+2026-01-28 02:07:35 - INFO - Theme changed to dark
+2026-01-28 02:11:05 - INFO - [Backup] Startup backup created
+2026-01-28 02:12:51 - INFO - [Backup] Startup backup created
+2026-01-28 02:12:56 - INFO - Theme changed to light
+2026-01-28 02:12:58 - INFO - Theme changed to dark
+2026-01-28 09:12:58 - INFO - [Backup] Startup backup created
+2026-01-28 09:13:06 - INFO - Theme changed to light
+2026-01-28 09:13:09 - INFO - Theme changed to dark
+2026-01-28 09:19:12 - INFO - [Backup] Startup backup created
+2026-01-28 09:34:20 - INFO - [Backup] Startup backup created
+2026-01-28 09:43:45 - INFO - [Backup] Startup backup created
+2026-01-28 09:44:35 - INFO - [Backup] Startup backup created
+2026-01-28 09:50:53 - INFO - [Backup] Startup backup created
+2026-01-28 09:53:26 - INFO - [Backup] Startup backup created
+2026-01-28 10:01:19 - INFO - [Backup] Startup backup created
+2026-01-28 10:03:12 - INFO - [Backup] Startup backup created
+2026-01-28 10:09:33 - INFO - [Backup] Startup backup created
+2026-01-28 10:12:38 - INFO - [Backup] Startup backup created
+2026-01-28 10:19:47 - INFO - [Backup] Startup backup created
+2026-01-28 10:26:55 - INFO - [Backup] Startup backup created
+2026-01-28 10:36:17 - INFO - [Backup] Startup backup created
+2026-01-28 10:40:36 - ERROR - [Outlook Sync] Outlook sync error: table messages has no column named message_type
+2026-01-28 10:41:23 - INFO - [Backup] Startup backup created
+2026-01-28 10:43:30 - ERROR - [Sync] Error syncing magdyb2000@hotmail.com: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+2026-01-28 10:52:56 - INFO - [Backup] Startup backup created
+2026-01-28 10:53:19 - ERROR - [Sync] Error syncing magdyb2000@hotmail.com: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+2026-01-28 11:02:07 - INFO - [Backup] Startup backup created
+2026-01-28 11:02:27 - ERROR - [Sync] Error syncing magdyb2000@hotmail.com: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+2026-01-28 11:12:34 - INFO - [Backup] Startup backup created
+2026-01-28 11:15:48 - ERROR - [Sync] Error syncing stephanie.triebskorn@tro-kost.de: read_messages_from_folder() got an unexpected keyword argument 'sender_email'
+2026-01-28 12:07:24 - INFO - [Backup] Startup backup created
+2026-01-28 12:12:48 - INFO - [Backup] Startup backup created
+2026-01-28 12:19:48 - INFO - [Backup] Startup backup created
+2026-01-28 12:23:06 - INFO - [Backup] Startup backup created
+2026-01-28 12:27:28 - INFO - [Backup] Startup backup created
+2026-01-28 12:29:29 - INFO - [Sync] Synced 50 messages for stephanie.triebskorn@tro-kost.de
+2026-01-28 12:43:37 - INFO - [Backup] Startup backup created
+2026-01-28 12:44:56 - INFO - [Sync] Found 50 messages for stephanie.triebskorn@tro-kost.de
+2026-01-28 12:55:14 - INFO - [Backup] Startup backup created
+2026-01-28 12:56:26 - INFO - [Sync] Found 50 messages for stephanie.triebskorn@tro-kost.de
+2026-01-28 13:07:46 - INFO - [Backup] Startup backup created
+2026-01-28 13:13:09 - INFO - [Backup] Startup backup created
+2026-01-28 13:19:40 - INFO - [Backup] Startup backup created
+2026-01-28 13:31:42 - INFO - [Backup] Startup backup created
+2026-01-28 13:42:19 - INFO - [Backup] Startup backup created
+2026-01-28 13:48:03 - INFO - [Backup] Startup backup created
+2026-01-28 14:00:54 - INFO - [Backup] Startup backup created
+2026-01-28 14:45:52 - ERROR - [Focus Messages Check] Error checking focus messages: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+2026-01-28 15:00:52 - ERROR - [Focus Messages Check] Error checking focus messages: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+2026-01-28 15:15:51 - ERROR - [Focus Messages Check] Error checking focus messages: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+2026-01-28 15:30:52 - ERROR - [Focus Messages Check] Error checking focus messages: 401 Client Error: Unauthorized for url: https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=20&$orderby=receivedDateTime%20desc
+2026-01-31 11:25:32 - INFO - [Backup] Startup backup created
+2026-01-31 11:36:52 - INFO - [Backup] Startup backup created
+2026-01-31 11:44:42 - INFO - [Backup] Startup backup created
+2026-01-31 11:55:45 - INFO - [Backup] Startup backup created
+2026-01-31 12:15:05 - INFO - [Backup] Startup backup created
+2026-01-31 12:26:49 - INFO - [Backup] Startup backup created
+2026-01-31 12:37:41 - INFO - [Backup] Startup backup created
+2026-01-31 12:49:00 - INFO - [Backup] Startup backup created
+2026-01-31 13:01:26 - INFO - [Backup] Startup backup created
+2026-01-31 13:11:32 - INFO - [Backup] Startup backup created
+2026-01-31 13:46:02 - INFO - [Backup] Startup backup created
+2026-01-31 13:46:46 - INFO - Theme changed to light
+2026-01-31 13:52:40 - INFO - [Backup] Startup backup created
+2026-01-31 14:07:01 - INFO - [Backup] Startup backup created
+2026-01-31 14:29:48 - INFO - [Backup] Startup backup created
+2026-01-31 14:39:21 - INFO - [Backup] Startup backup created
+2026-01-31 14:51:40 - INFO - [Backup] Startup backup created
+2026-01-31 14:59:43 - INFO - [Backup] Startup backup created
+2026-01-31 15:06:51 - INFO - [Backup] Startup backup created
+2026-01-31 15:12:51 - INFO - [Backup] Startup backup created
+2026-01-31 15:24:07 - INFO - [Backup] Startup backup created
+2026-01-31 15:30:40 - INFO - [Backup] Startup backup created
+2026-01-31 15:37:08 - INFO - [Backup] Startup backup created
+2026-01-31 19:07:50 - INFO - [Backup] Startup backup created
+2026-01-31 19:24:39 - INFO - [Backup] Startup backup created
+2026-01-31 19:33:49 - INFO - [Backup] Startup backup created
+2026-01-31 19:45:38 - INFO - [Backup] Startup backup created
+2026-01-31 19:54:49 - INFO - [Backup] Startup backup created
+2026-01-31 20:07:19 - INFO - [Backup] Startup backup created
+2026-02-01 08:55:05 - INFO - [Backup] Startup backup created
+2026-02-01 09:16:42 - INFO - [Backup] Startup backup created
+2026-02-01 09:39:56 - INFO - [Backup] Startup backup created
+2026-02-01 09:46:09 - INFO - [Backup] Startup backup created
+2026-02-01 10:00:05 - INFO - [Backup] Startup backup created
+2026-02-03 10:47:16 - INFO - [Backup] Startup backup created
