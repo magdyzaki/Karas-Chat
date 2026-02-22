@@ -39,6 +39,16 @@ const publicDir = path.join(__dirname, 'public');
 if (fs.existsSync(publicDir)) app.use(express.static(publicDir));
 
 app.get('/', (req, res) => res.json({ ok: true, msg: 'Chat API - استخدم التطبيق' }));
+app.get('/register', (req, res) => {
+  const p = path.join(__dirname, 'public', 'register.html');
+  if (fs.existsSync(p)) return res.sendFile(p);
+  res.status(404).send('Not found');
+});
+app.get('/register.html', (req, res) => {
+  const p = path.join(__dirname, 'public', 'register.html');
+  if (fs.existsSync(p)) return res.sendFile(p);
+  res.status(404).send('Not found');
+});
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
