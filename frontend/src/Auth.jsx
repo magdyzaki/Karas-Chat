@@ -175,14 +175,16 @@ export default function Auth({ onLogin }) {
             <>
               <input type="text" placeholder="الاسم" value={name} onChange={(e) => setName(e.target.value)} style={styles.input} />
               {(inviteRequired || inviteCode) && (
-                <input
-                  type="text"
-                  placeholder="رمز الدعوة (من الرابط أو أدخله يدوياً)"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  style={styles.input}
-                  required={inviteRequired}
-                />
+                <>
+                  <input
+                    type="text"
+                    placeholder="رمز الدعوة (اختياري للأرقام المعتمدة)"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    style={styles.input}
+                  />
+                  <p style={{ ...styles.hint, marginTop: -6, marginBottom: 8 }}>الأرقام في TRUSTED_PHONES يمكنها التسجيل بدون رابط الدعوة</p>
+                </>
               )}
             </>
           )}
