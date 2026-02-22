@@ -521,20 +521,33 @@ export const db = {
     const arr = low.data.conversation_reads || [];
     return arr.filter((r) => r.conversation_id === Number(conversationId));
   },
-  createInviteLink(userId) {
+  async createInviteLink(userId) {
+    if (process.env.DATABASE_URL) {
+      try {
+        const pg = await import('./invite-pg.js');
+        const row = await pg.pgCreateInviteLink(userId);
+        if (row) return row;
+      } catch (e) {
+        console.error('invite-pg create:', e.message);
+      }
+    }
     low.read();
     const token = 'i_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
-    const row = {
-      token,
-      created_by: Number(userId),
-      created_at: now(),
-      used_at: null
-    };
+    const row = { token, created_by: Number(userId), created_at: now(), used_at: null };
     low.data.invite_links.push(row);
     low.write();
     return row;
   },
-  consumeInviteLink(token) {
+  async consumeInviteLink(token) {
+    if (process.env.DATABASE_URL) {
+      try {
+        const pg = await import('./invite-pg.js');
+        const ok = await pg.pgConsumeInviteLink(token);
+        if (ok) return true;
+      } catch (e) {
+        console.error('invite-pg consume:', e.message);
+      }
+    }
     low.read();
     const row = low.data.invite_links.find((l) => l.token === token && !l.used_at);
     if (!row) return false;
@@ -542,9 +555,19 @@ export const db = {
     low.write();
     return true;
   },
-  getInviteLink(token) {
+  async getInviteLink(token) {
+    if (process.env.DATABASE_URL) {
+      try {
+        const pg = await import('./invite-pg.js');
+        const link = await pg.pgGetInviteLink(token);
+        return link ? { ...link, used_at: link.used_at || null } : null;
+      } catch (e) {
+        console.error('invite-pg get:', e.message);
+        return null;
+      }
+    }
     low.read();
-    return low.data.invite_links.find((l) => l.token === token);
+    return low.data.invite_links.find((l) => l.token === token) || null;
   },
   leaveConversation(conversationId, userId) {
     low.read();

@@ -79,7 +79,7 @@ router.post('/register', async (req, res) => {
   if (INVITE_ONLY) {
     const token = String(inviteToken || '').trim();
     if (!token) return res.status(403).json({ error: 'تحتاج رمز دعوة للتسجيل. اطلب الرابط من المسؤول.' });
-    const link = db.getInviteLink(token);
+    const link = await db.getInviteLink(token);
     if (!link) return res.status(403).json({ error: 'رمز الدعوة غير صالح.' });
     if (link.used_at) return res.status(403).json({ error: 'تم استخدام رمز الدعوة مسبقاً.' });
   }
@@ -101,7 +101,7 @@ router.post('/register', async (req, res) => {
   });
 
   // استهلاك رمز الدعوة بعد نجاح التسجيل
-  if (INVITE_ONLY && inviteToken) db.consumeInviteLink(String(inviteToken).trim());
+  if (INVITE_ONLY && inviteToken) await db.consumeInviteLink(String(inviteToken).trim());
 
   if (SKIP_VERIFICATION || (phone && isTrustedPhone(phone))) {
     db.setUserVerified(user.id, true);

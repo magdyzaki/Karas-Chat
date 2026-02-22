@@ -7,30 +7,30 @@ const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '1').split(',').map((s) => pars
 const isAdmin = (id) => id && ADMIN_IDS.includes(Number(id));
 
 // إنشاء رابط دعوة (للأدمن فقط)
-router.post('/invite-links', jwtVerify, (req, res) => {
+router.post('/invite-links', jwtVerify, async (req, res) => {
   if (!isAdmin(req.userId)) return res.status(403).json({ error: 'غير مصرح - إنشاء الروابط مقتصر على الأدمن' });
-  const row = db.createInviteLink(req.userId);
+  const row = await db.createInviteLink(req.userId);
   res.json({ token: row.token });
 });
 
 // التحقق فقط — لا يُستهلك (لتفادي استهلاك الرابط عند معاينة واتساب)
-router.get('/check-invite/:token', (req, res) => {
+router.get('/check-invite/:token', async (req, res) => {
   const { token } = req.params;
   if (!token) return res.status(400).json({ valid: false, error: 'رابط غير صالح' });
-  const link = db.getInviteLink(token);
+  const link = await db.getInviteLink(token);
   if (!link) return res.json({ valid: false, used: false, error: 'رابط غير صالح' });
   if (link.used_at) return res.json({ valid: false, used: true, error: 'تم استخدام هذا الرابط مسبقاً' });
   res.json({ valid: true, used: false });
 });
 
 // استهلاك الرابط — يُستدعى فقط عند الضغط على «انتقل إلى التطبيق»
-router.post('/consume-invite/:token', (req, res) => {
+router.post('/consume-invite/:token', async (req, res) => {
   const { token } = req.params;
   if (!token) return res.status(400).json({ ok: false, error: 'رابط غير صالح' });
-  const link = db.getInviteLink(token);
+  const link = await db.getInviteLink(token);
   if (!link) return res.json({ ok: false, error: 'رابط غير صالح' });
   if (link.used_at) return res.json({ ok: false, error: 'الرابط مُستهلَك مسبقاً' });
-  const ok = db.consumeInviteLink(token);
+  const ok = await db.consumeInviteLink(token);
   if (!ok) return res.json({ ok: false, error: 'فشل' });
   res.json({ ok: true });
 });
