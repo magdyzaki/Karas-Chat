@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>تسجيل — Karas شات</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #eee; margin: 0; padding: 20px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .box { background: #252525; border-radius: 12px; padding: 24px; max-width: 360px; width: 100%; border: 1px solid #333; }
+    h1 { margin: 0 0 20px; font-size: 22px; }
+    input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #444; border-radius: 8px; background: #1a1a1a; color: #eee; font-size: 16px; }
+    button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: #0a7c42; color: #fff; font-size: 16px; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .err { color: #f85149; font-size: 14px; margin-bottom: 12px; }
+    .ok { color: #3fb950; margin: 16px 0; }
+    a { color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>إنشاء حساب</h1>
+    <p id="err" class="err" style="display:none;"></p>
+    <p id="ok" class="ok" style="display:none;"></p>
+    <form id="f">
+      <input type="text" id="name" placeholder="الاسم" required>
+      <input type="text" id="emailOrPhone" placeholder="رقم الموبايل أو البريد (مثال: 01234567890)" inputmode="tel" required>
+      <input type="password" id="password" placeholder="كلمة المرور (6+ أحرف)" minlength="6" required>
+      <button type="submit" id="btn">تسجيل</button>
+    </form>
+    <p style="margin-top:16px;font-size:14px;color:#8b949e;">بعد التسجيل: <a href="https://karas-chat.vercel.app" target="_blank">افتح التطبيق</a> وسجّل الدخول</p>
+  </div>
+  <script>
+    const API = window.location.origin;
+    const f = document.getElementById('f');
+    const err = document.getElementById('err');
+    const ok = document.getElementById('ok');
+    const btn = document.getElementById('btn');
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      err.style.display = 'none';
+      ok.style.display = 'none';
+      btn.disabled = true;
+      try {
+        const r = await fetch(API + '/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            emailOrPhone: document.getElementById('emailOrPhone').value.trim(),
+            password: document.getElementById('password').value,
+            name: document.getElementById('name').value.trim(),
+            inviteToken: ''
+          })
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          err.textContent = data.error || 'فشل التسجيل';
+          err.style.display = 'block';
+        } else {
+          ok.innerHTML = 'تم التسجيل بنجاح! <a href="https://karas-chat.vercel.app" target="_blank">افتح التطبيق وسجّل الدخول</a>';
+          ok.style.display = 'block';
+          f.reset();
+        }
+      } catch (e) {
+        err.textContent = e.message || 'فشل الاتصال';
+        err.style.display = 'block';
+      }
+      btn.disabled = false;
+    };
+  </script>
+</body>
+</html>

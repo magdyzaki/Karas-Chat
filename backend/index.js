@@ -35,6 +35,8 @@ app.use(express.json());
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 app.use('/uploads', express.static(uploadsDir));
+const publicDir = path.join(__dirname, 'public');
+if (fs.existsSync(publicDir)) app.use(express.static(publicDir));
 
 app.get('/', (req, res) => res.json({ ok: true, msg: 'Chat API - استخدم التطبيق' }));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
