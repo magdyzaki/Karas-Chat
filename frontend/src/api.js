@@ -210,7 +210,7 @@ export async function getMessages(conversationId, limit = 100, before = null) {
   const res = await apiFetch(path, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب الرسائل');
-  return { messages: data.messages || [], readReceipts: data.readReceipts || [], reactions: data.reactions || [] };
+  return { messages: data.messages || [], readReceipts: data.readReceipts || [], reactions: data.reactions || [], pollVotes: data.pollVotes || [] };
 }
 
 export async function muteConversation(conversationId) {

@@ -98,12 +98,24 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
 
   useEffect(() => {
     if (!conversation?.id) return;
-    const poll = () => api.getMessages(conversation.id).then((d) => setMessages(Array.isArray(d?.messages) ? d.messages : [])).catch(() => {});
+    const poll = () =>
+      api.getMessages(conversation.id).then((d) => {
+        if (Array.isArray(d?.messages)) setMessages(d.messages);
+        if (Array.isArray(d?.readReceipts)) setReadReceipts(d.readReceipts);
+        if (Array.isArray(d?.reactions)) {
+          const byMsg = {};
+          (d.reactions || []).forEach((r) => {
+            if (!byMsg[r.message_id]) byMsg[r.message_id] = [];
+            byMsg[r.message_id].push(r);
+          });
+          setReactions(byMsg);
+        }
+        if (Array.isArray(d?.pollVotes)) setPollVotes(d.pollVotes);
+      }).catch(() => {});
     poll();
-    const interval = socket?.connected ? 8000 : 4000;
-    const id = setInterval(poll, interval);
+    const id = setInterval(poll, 3000);
     return () => clearInterval(id);
-  }, [conversation?.id, socket?.connected]);
+  }, [conversation?.id]);
 
   useEffect(() => {
     if (!conversation?.id) return;
@@ -378,23 +390,25 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
         return;
       }
     }
-    if (socket?.connected) {
-      socket.emit('stop_typing', { conversationId: conversation.id });
-      socket.emit('send_message', payload);
+    socket?.emit('stop_typing', { conversationId: conversation.id });
+    try {
+      const msg = await api.sendMessage(conversation.id, {
+        type: payload.type,
+        content: payload.content,
+        file_name: payload.file_name,
+        reply_to_id: payload.reply_to_id,
+        reply_to_snippet: payload.reply_to_snippet,
+        encrypted: payload.encrypted,
+        iv: payload.iv
+      });
       playSent();
-    } else {
-      api.sendMessage(conversation.id, payload)
-        .then((msg) => {
-          playSent();
-          setOptimisticVersion((v) => v + 1);
-          optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
-          setMessages((prev) => [...prev, msg]);
-        })
-        .catch((err) => {
-          setFileError(err?.message || 'فشل الإرسال');
-          optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
-          setOptimisticVersion((v) => v + 1);
-        });
+      setOptimisticVersion((v) => v + 1);
+      optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
+      if (msg) setMessages((prev) => [...prev, { ...msg, conversation_id: conversation.id }]);
+    } catch (err) {
+      setFileError(err?.message || 'فشل الإرسال');
+      optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
+      setOptimisticVersion((v) => v + 1);
     }
   };
 
