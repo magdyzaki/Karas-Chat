@@ -135,6 +135,15 @@ function App() {
         return [{ ...conv }, ...rest];
       });
     });
+    sock.on('conversation_added', (data) => {
+      const conv = data?.conversation;
+      if (!conv?.id) return;
+      sock.emit('join_conversation', conv.id);
+      setConversations((prev) => {
+        if (prev.some((c) => c.id === conv.id)) return prev;
+        return [{ ...conv, label: conv.label || conv.name || 'محادثة جديدة' }, ...prev];
+      });
+    });
     sock.on('incoming_call', (data) => {
       playCallRing();
       setIncomingCall(data);
@@ -143,6 +152,7 @@ function App() {
     setSocket(sock);
     return () => {
       sock.off('new_message');
+      sock.off('conversation_added');
       sock.off('incoming_call');
       sock.off('call_ended');
       sock.disconnect();

@@ -1,0 +1,12 @@
+{
+  "javascript.validate.enable": true,
+  "javascript.suggest.autoImports": true,
+  "editor.formatOnSave": false,
+  "files.associations": {
+    "*.jsx": "javascriptreact"
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true
+  }
+}

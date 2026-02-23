@@ -97,9 +97,11 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
   const sentPlaintextQueueRef = useRef([]);
 
   useEffect(() => {
-    if (!conversation?.id || socket?.connected) return;
+    if (!conversation?.id) return;
     const poll = () => api.getMessages(conversation.id).then((d) => setMessages(Array.isArray(d?.messages) ? d.messages : [])).catch(() => {});
-    const id = setInterval(poll, 4000);
+    poll();
+    const interval = socket?.connected ? 8000 : 4000;
+    const id = setInterval(poll, interval);
     return () => clearInterval(id);
   }, [conversation?.id, socket?.connected]);
 

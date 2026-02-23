@@ -6,7 +6,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
-import { db } from './db.js';
+import { db } from './db-api.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import convRoutes from './routes/conversations.js';
@@ -98,6 +98,7 @@ app.post('/api/upload-avatar', jwtVerify, upload.single('file'), (req, res) => {
 });
 
 app.set('io', io);
+app.set('userSockets', userSockets);
 const PORT = process.env.PORT || 5000;
 
 function shutdown(signal) {
@@ -127,20 +128,22 @@ httpServer.listen(PORT, HOST, async () => {
 const userSockets = new Map();
 const activeGroupCalls = new Map();
 
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error('غير مصرح'));
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return next(new Error('رمز غير صالح'));
-    if (db.isUserBlocked(decoded.userId)) return next(new Error('تم إيقاف وصولك'));
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (await db.isUserBlocked(decoded.userId)) return next(new Error('تم إيقاف وصولك'));
     socket.userId = decoded.userId;
     next();
-  });
+  } catch (_) {
+    next(new Error('رمز غير صالح'));
+  }
 });
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   const uid = socket.userId;
-  db.setUserLastSeen(uid);
+  db.setUserLastSeen(uid).catch(() => {});
   if (!userSockets.has(uid)) userSockets.set(uid, new Set());
   userSockets.get(uid).add(socket.id);
 
@@ -152,47 +155,51 @@ io.on('connection', (socket) => {
     socket.leave('conv_' + conversationId);
   });
 
-  socket.on('send_message', (data) => {
+  socket.on('send_message', async (data) => {
     const { conversationId, type, content, file_name, reply_to_id, reply_to_snippet, encrypted, iv } = data || {};
     if (!conversationId || (!content && (type === 'text' || type === 'poll'))) return;
-    const conv = db.getConversationByIdAndUser(conversationId, uid);
-    if (!conv) return;
-    const msg = db.addMessage({
-      conversation_id: conversationId,
-      sender_id: uid,
-      type: type || 'text',
-      content: content || '',
-      file_name: file_name || null,
-      reply_to_id: reply_to_id || null,
-      reply_to_snippet: reply_to_snippet || null,
-      encrypted: !!encrypted,
-      iv: iv || null
-    });
-    const user = db.findUserById(uid);
-    const payload = { ...msg, sender: user ? { id: user.id, name: user.name, email: user.email, phone: user.phone } : null };
-    if (msg.encrypted) payload.sender_public_key = db.getUserPublicKey(uid);
-    io.to('conv_' + conversationId).emit('new_message', payload);
-    const members = conv.members || db.getMemberIds(conversationId);
-    const baseUrl = process.env.BASE_URL || '';
-    for (const mid of members) {
-      if (Number(mid) === Number(uid)) continue;
-      if (db.isConversationMuted(mid, conversationId)) continue;
-      const isOnline = userSockets.has(Number(mid));
-      if (!isOnline) {
-        sendPushToUser(mid, {
-          title: 'رسالة جديدة',
-          body: (user?.name || user?.email || user?.phone || 'شخص') + ': ' + (msg.type === 'text' ? (msg.content || '').slice(0, 50) : 'وسائط'),
-          tag: 'chat-' + conversationId,
-          data: { url: baseUrl + '/', conversationId }
-        }).catch(() => {});
+    try {
+      const conv = await db.getConversationByIdAndUser(conversationId, uid);
+      if (!conv) return;
+      const msg = await db.addMessage({
+        conversation_id: conversationId,
+        sender_id: uid,
+        type: type || 'text',
+        content: content || '',
+        file_name: file_name || null,
+        reply_to_id: reply_to_id || null,
+        reply_to_snippet: reply_to_snippet || null,
+        encrypted: !!encrypted,
+        iv: iv || null
+      });
+      const user = await db.findUserById(uid);
+      const payload = { ...msg, sender: user ? { id: user.id, name: user.name, email: user.email, phone: user.phone } : null };
+      if (msg.encrypted) payload.sender_public_key = await db.getUserPublicKey(uid);
+      io.to('conv_' + conversationId).emit('new_message', payload);
+      const members = conv.members?.length ? conv.members : await db.getMemberIds(conversationId);
+      const baseUrl = process.env.BASE_URL || '';
+      for (const mid of members) {
+        if (Number(mid) === Number(uid)) continue;
+        if (db.isConversationMuted(mid, conversationId)) continue;
+        const isOnline = userSockets.has(Number(mid));
+        if (!isOnline) {
+          sendPushToUser(mid, {
+            title: 'رسالة جديدة',
+            body: (user?.name || user?.email || user?.phone || 'شخص') + ': ' + (msg.type === 'text' ? (msg.content || '').slice(0, 50) : 'وسائط'),
+            tag: 'chat-' + conversationId,
+            data: { url: baseUrl + '/', conversationId }
+          }).catch(() => {});
+        }
       }
+    } catch (e) {
+      console.error('send_message:', e.message);
     }
   });
 
-  socket.on('typing', (data) => {
+  socket.on('typing', async (data) => {
     const { conversationId } = data || {};
     if (!conversationId) return;
-    const user = db.findUserById(uid);
+    const user = await db.findUserById(uid);
     socket.to('conv_' + conversationId).emit('user_typing', { userId: uid, userName: user ? user.name || user.email || user.phone : 'شخص' });
   });
 
@@ -202,59 +209,59 @@ io.on('connection', (socket) => {
     socket.to('conv_' + conversationId).emit('user_stop_typing', { userId: uid });
   });
 
-  socket.on('mark_read', (data) => {
+  socket.on('mark_read', async (data) => {
     const { conversationId, lastMessageId } = data || {};
     if (!conversationId) return;
-    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    const conv = await db.getConversationByIdAndUser(conversationId, uid);
     if (!conv) return;
-    db.setConversationRead(conversationId, uid, lastMessageId);
+    await db.setConversationRead(conversationId, uid, lastMessageId);
     socket.to('conv_' + conversationId).emit('read_receipt', { userId: uid, conversationId: Number(conversationId), lastMessageId: lastMessageId != null ? Number(lastMessageId) : null });
   });
 
-  socket.on('add_reaction', (data) => {
+  socket.on('add_reaction', async (data) => {
     const { messageId, conversationId, emoji } = data || {};
     if (!messageId || !conversationId || !emoji) return;
-    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    const conv = await db.getConversationByIdAndUser(conversationId, uid);
     if (!conv) return;
-    if (!db.isMessageInConversation(messageId, conversationId)) return;
-    db.addMessageReaction(messageId, uid, emoji);
+    if (!(await db.isMessageInConversation(messageId, conversationId))) return;
+    await db.addMessageReaction(messageId, uid, emoji);
     io.to('conv_' + conversationId).emit('reaction_added', { messageId: Number(messageId), userId: uid, emoji: String(emoji).slice(0, 10) });
   });
 
-  socket.on('remove_reaction', (data) => {
+  socket.on('remove_reaction', async (data) => {
     const { messageId, conversationId } = data || {};
     if (!messageId || !conversationId) return;
-    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    const conv = await db.getConversationByIdAndUser(conversationId, uid);
     if (!conv) return;
-    db.removeMessageReaction(messageId, uid);
+    await db.removeMessageReaction(messageId, uid);
     io.to('conv_' + conversationId).emit('reaction_removed', { messageId: Number(messageId), userId: uid });
   });
 
-  socket.on('delete_message', (data) => {
+  socket.on('delete_message', async (data) => {
     const { conversationId, messageId, forEveryone } = data || {};
     if (!conversationId || !messageId) return;
-    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    const conv = await db.getConversationByIdAndUser(conversationId, uid);
     if (!conv) return;
     const payload = { messageId: Number(messageId), conversationId: Number(conversationId) };
     if (forEveryone) {
-      const ok = db.deleteMessageForEveryone(messageId, conversationId, uid);
+      const ok = await db.deleteMessageForEveryone(messageId, conversationId, uid);
       if (ok) io.to('conv_' + conversationId).emit('message_deleted', payload);
     } else {
-      const ok = db.deleteMessageForMe(messageId, conversationId, uid);
+      const ok = await db.deleteMessageForMe(messageId, conversationId, uid);
       if (ok) socket.emit('message_deleted', payload);
     }
   });
 
-  socket.on('start_call', (data) => {
+  socket.on('start_call', async (data) => {
     const { conversationId, toUserId, isVideo } = data || {};
     if (!conversationId) return;
-    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    const conv = await db.getConversationByIdAndUser(conversationId, uid);
     if (!conv || !conv.members || conv.members.length < 2) return;
     const targetId = conv.type === 'direct'
       ? conv.members.find((m) => Number(m) !== Number(uid))
       : (toUserId != null ? Number(toUserId) : null);
     if (targetId == null) return;
-    const user = db.findUserById(uid);
+    const user = await db.findUserById(uid);
     const payload = {
       conversationId: Number(conversationId),
       fromUserId: uid,
@@ -308,15 +315,15 @@ io.on('connection', (socket) => {
     socket.to('conv_' + conversationId).emit('call_ended', { conversationId: Number(conversationId) });
   });
 
-  socket.on('start_group_call', (data) => {
+  socket.on('start_group_call', async (data) => {
     const { conversationId } = data || {};
     if (!conversationId) return;
-    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    const conv = await db.getConversationByIdAndUser(conversationId, uid);
     if (!conv || conv.type !== 'group' || !conv.members || conv.members.length < 2) return;
     const cid = Number(conversationId);
     if (!activeGroupCalls.has(cid)) activeGroupCalls.set(cid, new Set());
     activeGroupCalls.get(cid).add(uid);
-    const user = db.findUserById(uid);
+    const user = await db.findUserById(uid);
     const payload = {
       conversationId: cid,
       initiatorId: uid,
@@ -327,16 +334,16 @@ io.on('connection', (socket) => {
     socket.to('conv_' + cid).emit('group_call_started', payload);
   });
 
-  socket.on('join_group_call', (data) => {
+  socket.on('join_group_call', async (data) => {
     const { conversationId } = data || {};
     if (!conversationId) return;
-    const conv = db.getConversationByIdAndUser(conversationId, uid);
+    const conv = await db.getConversationByIdAndUser(conversationId, uid);
     if (!conv) return;
     const cid = Number(conversationId);
     if (!activeGroupCalls.has(cid)) return;
     const participants = activeGroupCalls.get(cid);
     participants.add(uid);
-    const user = db.findUserById(uid);
+    const user = await db.findUserById(uid);
     io.to('conv_' + cid).emit('group_call_user_joined', {
       conversationId: cid,
       userId: uid,
@@ -367,7 +374,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    db.setUserLastSeen(uid);
+    db.setUserLastSeen(uid).catch(() => {});
     if (userSockets.has(uid)) {
       userSockets.get(uid).delete(socket.id);
       if (userSockets.get(uid).size === 0) userSockets.delete(uid);

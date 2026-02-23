@@ -1,10 +1,10 @@
-# Postgres setup for invite links (fix "رمز الدعوة غير صالح")
+# Postgres setup — بقاء البيانات بعد إعادة التشغيل
 
 ## Problem
-Render free tier uses ephemeral disk - data is lost on restart. Invite links disappear.
+Render free tier uses ephemeral disk - data is lost on restart. **الرسائل والمحادثات والمستخدمين تختفي.**
 
 ## Solution
-Store invite links in Render's free PostgreSQL (persistent).
+Store **invite links + users + conversations + messages** in Render's free PostgreSQL (persistent).
 
 ---
 
@@ -29,10 +29,11 @@ npm install pg --save
 4. Save (Render will redeploy automatically)
 
 ### 4. Deploy backend
-Push your code or trigger Manual Deploy. The backend will use Postgres for invite links.
+Push your code or trigger Manual Deploy. The backend will create tables automatically on first run.
 
 ---
 
 ## After setup
-- Invite links persist across restarts
-- Create new invite link and test
+- **Users, conversations, messages** persist across restarts
+- **Invite links** persist
+- **الرسائل لن تختفي** عند تحديث الصفحة أو إعادة تشغيل السيرفر
