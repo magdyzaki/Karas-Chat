@@ -471,6 +471,22 @@ export async function pgGetUnverifiedUsers() {
   return r.rows.map((x) => ({ id: x.id, email: x.email, phone: x.phone, name: x.name, created_at: x.created_at }));
 }
 
+export async function pgFindUsersByPhones(phoneNumbers, excludeUserId = null) {
+  const p = await getPool();
+  if (!p) return [];
+  const normalizedSet = new Set();
+  for (const raw of phoneNumbers || []) {
+    const ph = normalizePhone(raw);
+    if (ph) normalizedSet.add(ph);
+  }
+  if (!normalizedSet.size) return [];
+  const exclude = excludeUserId != null ? Number(excludeUserId) : null;
+  const r = await p.query('SELECT id, email, phone, name, avatar_url FROM chat_users WHERE phone IS NOT NULL');
+  return r.rows
+    .filter((u) => normalizedSet.has(normalizePhone(u.phone)) && (!exclude || u.id !== exclude))
+    .map((u) => ({ id: u.id, email: u.email, phone: u.phone, name: u.name, avatar_url: u.avatar_url || null }));
+}
+
 export async function pgListUsersExcept(userId) {
   const p = await getPool();
   if (!p) return [];

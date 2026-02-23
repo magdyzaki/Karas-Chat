@@ -86,5 +86,5 @@ export const db = {
   addStory: (d) => lowDb.addStory(d),
   getStoriesForFeed: (id) => lowDb.getStoriesForFeed(id),
   getStoriesByUser: (id) => lowDb.getStoriesByUser(id),
-  findUsersByPhones: (arr, excl) => lowDb.findUsersByPhones(arr, excl)
+  findUsersByPhones: (arr, excl) => runPg(pg.pgFindUsersByPhones, lowDb.findUsersByPhones, arr, excl)
 };

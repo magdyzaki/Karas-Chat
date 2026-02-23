@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
 router.post('/check-contacts', async (req, res) => {
   const { phoneNumbers } = req.body || {};
   const arr = Array.isArray(phoneNumbers) ? phoneNumbers : (typeof phoneNumbers === 'string' ? [phoneNumbers] : []);
-  const users = db.findUsersByPhones(arr, req.userId);
+  const users = await db.findUsersByPhones(arr, req.userId);
   res.json({ users });
 });
 
