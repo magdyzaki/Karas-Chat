@@ -97,6 +97,9 @@ app.post('/api/upload-avatar', jwtVerify, upload.single('file'), (req, res) => {
   res.json({ avatar_url: url });
 });
 
+const userSockets = new Map();
+const activeGroupCalls = new Map();
+
 app.set('io', io);
 app.set('userSockets', userSockets);
 const PORT = process.env.PORT || 5000;
@@ -124,9 +127,6 @@ httpServer.listen(PORT, HOST, async () => {
     }
   }
 });
-
-const userSockets = new Map();
-const activeGroupCalls = new Map();
 
 io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token;

@@ -406,7 +406,7 @@ export async function pgDeleteMessageForMe(messageId, conversationId, userId) {
 export async function pgDeleteMessageForEveryone(messageId, conversationId, userId) {
   const p = await getPool();
   if (!p) return false;
-  const r = await p.query('UPDATE chat_messages SET deleted_for_everyone = true, content = '', file_name = NULL WHERE id = $1 AND conversation_id = $2 AND sender_id = $3 RETURNING id', [Number(messageId), Number(conversationId), Number(userId)]);
+  const r = await p.query(`UPDATE chat_messages SET deleted_for_everyone = true, content = '', file_name = NULL WHERE id = $1 AND conversation_id = $2 AND sender_id = $3 RETURNING id`, [Number(messageId), Number(conversationId), Number(userId)]);
   return r.rowCount > 0;
 }
 

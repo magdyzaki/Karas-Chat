@@ -7,7 +7,8 @@ const isAdmin = (id) => id && ADMIN_IDS.includes(Number(id));
 
 router.get('/', async (req, res) => {
   let users = await db.listUsersExcept(req.userId);
-  users = users.filter((u) => !(await db.isUserBlocked(u.id)));
+  const blocked = await Promise.all(users.map((u) => db.isUserBlocked(u.id)));
+  users = users.filter((_, i) => !blocked[i]);
   res.json({ users });
 });
 
