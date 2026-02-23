@@ -16,8 +16,9 @@ import CallModal from './CallModal';
 import WebRTCCall from './WebRTCCall';
 import { playReceived, playCallRing, stopCallRing } from './sounds';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || '';
-const BUILD_ID = 'chat-2026-02-10-02';
+const BACKEND_URL = 'https://karas-chat-backend.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.location?.hostname !== 'localhost' ? BACKEND_URL : '');
+const BUILD_ID = 'chat-2026-02-14-01';
 
 function App() {
   const [user, setUser] = useState(null);
