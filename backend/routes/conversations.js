@@ -100,6 +100,30 @@ router.post('/:id/forward', (req, res) => {
   res.json({ message: payload });
 });
 
+router.post('/:id/messages', (req, res) => {
+  const conv = db.getConversationByIdAndUser(req.params.id, req.userId);
+  if (!conv) return res.status(404).json({ error: 'المحادثة غير موجودة' });
+  const { type, content, file_name, reply_to_id, reply_to_snippet, encrypted, iv } = req.body || {};
+  if (!content && (type === 'text' || type === 'poll' || !type)) return res.status(400).json({ error: 'محتوى الرسالة مطلوب' });
+  const msg = db.addMessage({
+    conversation_id: conv.id,
+    sender_id: req.userId,
+    type: type || 'text',
+    content: content || '',
+    file_name: file_name || null,
+    reply_to_id: reply_to_id || null,
+    reply_to_snippet: reply_to_snippet || null,
+    encrypted: !!encrypted,
+    iv: iv || null
+  });
+  const user = db.findUserById(req.userId);
+  const payload = { ...msg, sender: user ? { id: user.id, name: user.name, email: user.email, phone: user.phone } : null };
+  if (msg.encrypted) payload.sender_public_key = db.getUserPublicKey(req.userId);
+  const io = req.app.get('io');
+  if (io) io.to('conv_' + conv.id).emit('new_message', payload);
+  res.json({ message: payload });
+});
+
 router.get('/:id/messages', (req, res) => {
   const conv = db.getConversationByIdAndUser(req.params.id, req.userId);
   if (!conv) return res.status(404).json({ error: 'المحادثة غير موجودة' });

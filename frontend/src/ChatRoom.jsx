@@ -97,6 +97,13 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
   const sentPlaintextQueueRef = useRef([]);
 
   useEffect(() => {
+    if (!conversation?.id || socket?.connected) return;
+    const poll = () => api.getMessages(conversation.id).then((d) => setMessages(Array.isArray(d?.messages) ? d.messages : [])).catch(() => {});
+    const id = setInterval(poll, 4000);
+    return () => clearInterval(id);
+  }, [conversation?.id, socket?.connected]);
+
+  useEffect(() => {
     if (!conversation?.id) return;
     setConvDetails(conversation);
     optimisticRef.current = [];
@@ -369,8 +376,24 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
         return;
       }
     }
-    if (socket) { socket.emit('stop_typing', { conversationId: conversation.id }); socket.emit('send_message', payload); }
-    playSent();
+    if (socket?.connected) {
+      socket.emit('stop_typing', { conversationId: conversation.id });
+      socket.emit('send_message', payload);
+      playSent();
+    } else {
+      api.sendMessage(conversation.id, payload)
+        .then((msg) => {
+          playSent();
+          setOptimisticVersion((v) => v + 1);
+          optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
+          setMessages((prev) => [...prev, msg]);
+        })
+        .catch((err) => {
+          setFileError(err?.message || 'فشل الإرسال');
+          optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
+          setOptimisticVersion((v) => v + 1);
+        });
+    }
   };
 
   const handleFile = async (e, imageOnly = false, replyToMsg = null) => {

@@ -193,6 +193,17 @@ export async function getConversation(id) {
   return data;
 }
 
+export async function sendMessage(conversationId, { type = 'text', content, file_name, reply_to_id, reply_to_snippet, encrypted, iv }) {
+  const res = await apiFetch(`/api/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ type, content, file_name, reply_to_id, reply_to_snippet, encrypted, iv })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إرسال الرسالة');
+  return data.message;
+}
+
 export async function getMessages(conversationId, limit = 100, before = null) {
   let path = `/api/conversations/${conversationId}/messages?limit=${limit}`;
   if (before) path += `&before=${before}`;
