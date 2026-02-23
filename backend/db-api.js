@@ -47,6 +47,7 @@ export const db = {
   addPollVote: (mid, cid, uid, opt) => runPg(pg.pgAddPollVote, lowDb.addPollVote, mid, cid, uid, opt),
   listUsersExcept: (uid) => runPg(pg.pgListUsersExcept, lowDb.listUsersExcept, uid),
   getArchivedConversationIds: (uid) => runPg(pg.pgGetArchivedConversationIds, lowDb.getArchivedConversationIds, uid),
+  getUnverifiedUsers: () => runPg(pg.pgGetUnverifiedUsers, lowDb.getUnverifiedUsers),
 
   getUserPublicKey: (id) => (usePg ? pg.pgGetUserPublicKey(id) : Promise.resolve(lowDb.getUserPublicKey(id))),
 
@@ -85,6 +86,5 @@ export const db = {
   addStory: (d) => lowDb.addStory(d),
   getStoriesForFeed: (id) => lowDb.getStoriesForFeed(id),
   getStoriesByUser: (id) => lowDb.getStoriesByUser(id),
-  getUnverifiedUsers: () => lowDb.getUnverifiedUsers(),
   findUsersByPhones: (arr, excl) => lowDb.findUsersByPhones(arr, excl)
 };

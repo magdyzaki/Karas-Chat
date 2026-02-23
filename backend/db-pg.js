@@ -464,6 +464,13 @@ export async function pgAddPollVote(messageId, conversationId, userId, optionInd
   }
 }
 
+export async function pgGetUnverifiedUsers() {
+  const p = await getPool();
+  if (!p) return [];
+  const r = await p.query('SELECT id, email, phone, name, created_at FROM chat_users WHERE verified = false');
+  return r.rows.map((x) => ({ id: x.id, email: x.email, phone: x.phone, name: x.name, created_at: x.created_at }));
+}
+
 export async function pgListUsersExcept(userId) {
   const p = await getPool();
   if (!p) return [];

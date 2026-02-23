@@ -2,7 +2,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db } from '../db.js';
+import { db } from '../db-api.js';
 import { jwtVerify } from '../middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,17 +56,17 @@ router.post('/unblock-user', (req, res) => {
   res.json({ ok: true });
 });
 
-router.get('/pending-users', (req, res) => {
+router.get('/pending-users', async (req, res) => {
   if (!isAdmin(req.userId)) return res.status(403).json({ error: 'غير مصرح' });
-  const list = db.getUnverifiedUsers();
+  const list = await db.getUnverifiedUsers();
   res.json({ users: list });
 });
 
-router.post('/approve-user', (req, res) => {
+router.post('/approve-user', async (req, res) => {
   if (!isAdmin(req.userId)) return res.status(403).json({ error: 'غير مصرح' });
   const { targetUserId } = req.body || {};
   if (!targetUserId) return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
-  const ok = db.setUserVerified(Number(targetUserId), true);
+  const ok = await db.setUserVerified(Number(targetUserId), true);
   if (!ok) return res.status(400).json({ error: 'المستخدم غير موجود أو مُفعّل مسبقاً' });
   res.json({ ok: true, msg: 'تم تفعيل الحساب' });
 });
