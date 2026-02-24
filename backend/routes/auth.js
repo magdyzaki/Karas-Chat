@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db } from '../db-api.js';
+import { db } from '../db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CODES_FILE = path.join(__dirname, '..', 'last_codes.json');
@@ -90,12 +90,12 @@ router.post('/register', async (req, res) => {
   }
 
   if (!email && !phone) return res.status(400).json({ error: 'أدخل بريداً إلكترونياً صحيحاً أو رقم موبايل (10 أرقام على الأقل)' });
-  if (email && (await db.findUserByEmail(email))) return res.status(400).json({ error: 'البريد مستخدم مسبقاً' });
-  if (phone && (await db.findUserByPhone(phone))) return res.status(400).json({ error: 'رقم الموبايل مستخدم مسبقاً' });
+  if (email && db.findUserByEmail(email)) return res.status(400).json({ error: 'البريد مستخدم مسبقاً' });
+  if (phone && db.findUserByPhone(phone)) return res.status(400).json({ error: 'رقم الموبايل مستخدم مسبقاً' });
   const password_hash = await bcrypt.hash(password, 10);
   const code = genCode();
   const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-  const user = await db.addUser({
+  const user = db.addUser({
     email: email || undefined,
     phone: phone || undefined,
     password_hash,
@@ -108,8 +108,8 @@ router.post('/register', async (req, res) => {
   if (INVITE_ONLY && inviteToken) await db.consumeInviteLink(String(inviteToken).trim());
 
   if (SKIP_VERIFICATION || (phone && isTrustedPhone(phone))) {
-    await db.setUserVerified(user.id, true);
-    const verifiedUser = await db.findUserById(user.id);
+    db.setUserVerified(user.id, true);
+    const verifiedUser = db.findUserById(user.id);
     const token = jwt.sign({ userId: verifiedUser.id }, JWT_SECRET, { expiresIn: '30d' });
     return res.json({ token, user: userToResponse(verifiedUser) });
   }
@@ -171,7 +171,7 @@ router.post('/register', async (req, res) => {
 router.post('/verify', async (req, res) => {
   const { emailOrPhone, code } = req.body || {};
   if (!emailOrPhone || !code) return res.status(400).json({ error: 'أدخل البريد/الهاتف ورمز التحقق' });
-  const user = await db.findUserByEmailOrPhone(emailOrPhone);
+  const user = db.findUserByEmailOrPhone(emailOrPhone);
   if (!user) return res.status(401).json({ error: 'الحساب غير موجود' });
   if (user.verified) {
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
@@ -183,8 +183,8 @@ router.post('/verify', async (req, res) => {
   if (user.verification_expires && new Date(user.verification_expires) < new Date()) {
     return res.status(401).json({ error: 'انتهت صلاحية الرمز. اطلب رمزاً جديداً.' });
   }
-  await db.setUserVerified(user.id, true);
-  const updated = await db.findUserById(user.id);
+  db.setUserVerified(user.id, true);
+  const updated = db.findUserById(user.id);
   const token = jwt.sign({ userId: updated.id }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user: userToResponse(updated) });
 });
@@ -192,7 +192,7 @@ router.post('/verify', async (req, res) => {
 router.post('/forgot-password', async (req, res) => {
   const { emailOrPhone } = req.body || {};
   if (!emailOrPhone || !String(emailOrPhone).trim()) return res.status(400).json({ error: 'أدخل البريد أو رقم الموبايل' });
-  const user = await db.findUserByEmailOrPhone(emailOrPhone.trim());
+  const user = db.findUserByEmailOrPhone(emailOrPhone.trim());
   if (!user) return res.status(401).json({ error: 'لا يوجد حساب بهذا البريد أو رقم الموبايل' });
   const { email, phone } = parseEmailOrPhone(emailOrPhone.trim());
   const code = genCode();
@@ -250,7 +250,7 @@ router.post('/reset-password', async (req, res) => {
   if (!emailOrPhone || !code || !newPassword || newPassword.length < 6) {
     return res.status(400).json({ error: 'أدخل البريد/الهاتف ورمز الاستعادة وكلمة مرور جديدة (6 أحرف على الأقل)' });
   }
-  const user = await db.findUserByEmailOrPhone(emailOrPhone.trim());
+  const user = db.findUserByEmailOrPhone(emailOrPhone.trim());
   if (!user) return res.status(401).json({ error: 'الحساب غير موجود' });
   const codeNorm = String(code || '').replace(/\D/g, '');
   const savedNorm = String(user.reset_code || '').replace(/\D/g, '');
@@ -259,21 +259,21 @@ router.post('/reset-password', async (req, res) => {
   const password_hash = await bcrypt.hash(newPassword, 10);
   db.updateUserPassword(user.id, password_hash);
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: userToResponse(await db.findUserById(user.id)) });
+  res.json({ token, user: userToResponse(db.findUserById(user.id)) });
 });
 
 router.post('/login', async (req, res) => {
   const { emailOrPhone, password } = req.body || {};
   if (!emailOrPhone || !password) return res.status(400).json({ error: 'البريد أو رقم الموبايل وكلمة المرور مطلوبان' });
-  const user = await db.findUserByEmailOrPhone(emailOrPhone);
+  const user = db.findUserByEmailOrPhone(emailOrPhone);
   if (!user) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
-  if (await db.isUserBlocked(user.id)) return res.status(403).json({ error: 'تم إيقاف وصولك من قبل المسؤول' });
+  if (db.isUserBlocked(user.id)) return res.status(403).json({ error: 'تم إيقاف وصولك من قبل المسؤول' });
   if (user.verified === false && !SKIP_VERIFICATION && !(user.phone && isTrustedPhone(user.phone))) {
     return res.status(403).json({ error: 'يجب تأكيد الحساب أولاً. أدخل رمز التحقق المرسل إليك.' });
   }
   if (user.verified === false && user.phone && isTrustedPhone(user.phone)) {
-    await db.setUserVerified(user.id, true);
-    const u = await db.findUserById(user.id);
+    db.setUserVerified(user.id, true);
+    const u = db.findUserById(user.id);
     if (u) user.verified = u.verified;
   }
   const ok = await bcrypt.compare(password, user.password_hash);

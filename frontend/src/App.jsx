@@ -16,9 +16,8 @@ import CallModal from './CallModal';
 import WebRTCCall from './WebRTCCall';
 import { playReceived, playCallRing, stopCallRing } from './sounds';
 
-const BACKEND_URL = 'https://karas-chat-backend.onrender.com';
-const SOCKET_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.location?.hostname !== 'localhost' ? BACKEND_URL : '');
-const BUILD_ID = 'chat-2026-02-14-01';
+const SOCKET_URL = import.meta.env.VITE_API_URL || '';
+const BUILD_ID = 'chat-2026-02-10-02';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -63,7 +62,6 @@ function App() {
   useEffect(() => {
     if (user && token) {
       api.getMe().then((d) => { if (d) { setIsAdmin(!!d.isAdmin); setUser((u) => u && ({ ...u, ...d })); localStorage.setItem('chat_user', JSON.stringify({ ...user, ...d })); } }).catch(() => {});
-      api.prewakeBackend();
     }
   }, [user?.id, token]);
 
@@ -136,15 +134,6 @@ function App() {
         return [{ ...conv }, ...rest];
       });
     });
-    sock.on('conversation_added', (data) => {
-      const conv = data?.conversation;
-      if (!conv?.id) return;
-      sock.emit('join_conversation', conv.id);
-      setConversations((prev) => {
-        if (prev.some((c) => c.id === conv.id)) return prev;
-        return [{ ...conv, label: conv.label || conv.name || 'محادثة جديدة' }, ...prev];
-      });
-    });
     sock.on('incoming_call', (data) => {
       playCallRing();
       setIncomingCall(data);
@@ -153,7 +142,6 @@ function App() {
     setSocket(sock);
     return () => {
       sock.off('new_message');
-      sock.off('conversation_added');
       sock.off('incoming_call');
       sock.off('call_ended');
       sock.disconnect();

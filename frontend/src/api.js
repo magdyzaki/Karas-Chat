@@ -193,31 +193,13 @@ export async function getConversation(id) {
   return data;
 }
 
-export async function sendMessage(conversationId, { type = 'text', content, file_name, reply_to_id, reply_to_snippet, encrypted, iv }) {
-  const opts = { method: 'POST', headers: headers(), body: JSON.stringify({ type, content, file_name, reply_to_id, reply_to_snippet, encrypted, iv }) };
-  const path = `/api/conversations/${conversationId}/messages`;
-  let res;
-  if (typeof window !== 'undefined' && window.location?.hostname !== 'localhost') {
-    try {
-      res = await fetch(BACKEND_DIRECT + path, opts);
-    } catch (_) {
-      res = await apiFetch(path, opts);
-    }
-  } else {
-    res = await apiFetch(path, opts);
-  }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'فشل إرسال الرسالة');
-  return data.message;
-}
-
 export async function getMessages(conversationId, limit = 100, before = null) {
   let path = `/api/conversations/${conversationId}/messages?limit=${limit}`;
   if (before) path += `&before=${before}`;
   const res = await apiFetch(path, { headers: headers() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'فشل جلب الرسائل');
-  return { messages: data.messages || [], readReceipts: data.readReceipts || [], reactions: data.reactions || [], pollVotes: data.pollVotes || [] };
+  return { messages: data.messages || [], readReceipts: data.readReceipts || [], reactions: data.reactions || [] };
 }
 
 export async function muteConversation(conversationId) {
