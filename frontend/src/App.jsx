@@ -63,6 +63,7 @@ function App() {
   useEffect(() => {
     if (user && token) {
       api.getMe().then((d) => { if (d) { setIsAdmin(!!d.isAdmin); setUser((u) => u && ({ ...u, ...d })); localStorage.setItem('chat_user', JSON.stringify({ ...user, ...d })); } }).catch(() => {});
+      api.prewakeBackend();
     }
   }, [user?.id, token]);
 

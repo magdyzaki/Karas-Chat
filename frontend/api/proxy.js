@@ -18,17 +18,28 @@ export default async function handler(req, res) {
   const h = { 'Content-Type': 'application/json' };
   if (clientHeaders?.Authorization) h.Authorization = clientHeaders.Authorization;
 
-  try {
-    const r = await fetch(url, {
+  const doFetch = () => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 30000);
+    return fetch(url, {
       method: String(method).toUpperCase(),
       headers: h,
-      body: body != null ? JSON.stringify(body) : undefined
-    });
-    const text = await r.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch (_) {}
-    res.status(r.status).json(data);
-  } catch (e) {
-    res.status(500).json({ error: e?.message || 'فشل الاتصال بالسيرفر' });
+      body: body != null ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal
+    }).finally(() => clearTimeout(t));
+  };
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await doFetch();
+      const text = await r.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (_) {}
+      return res.status(r.status).json(data);
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
+    }
   }
+  res.status(500).json({ error: lastErr?.message || 'فشل الاتصال بالسيرفر. جرّب مرة أخرى.' });
 }
