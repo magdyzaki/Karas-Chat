@@ -391,26 +391,24 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
       }
     }
     socket?.emit('stop_typing', { conversationId: conversation.id });
-    const apiPayload = { type: payload.type, content: payload.content, file_name: payload.file_name, reply_to_id: payload.reply_to_id, reply_to_snippet: payload.reply_to_snippet, encrypted: payload.encrypted, iv: payload.iv };
-    try {
-      const msg = await api.sendMessage(conversation.id, apiPayload);
+    if (socket?.connected) {
+      socket.emit('send_message', {
+        conversationId: conversation.id,
+        type: payload.type,
+        content: payload.content,
+        file_name: payload.file_name,
+        reply_to_id: payload.reply_to_id,
+        reply_to_snippet: payload.reply_to_snippet,
+        encrypted: payload.encrypted,
+        iv: payload.iv
+      });
       playSent();
       setOptimisticVersion((v) => v + 1);
       optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
-      if (msg) setMessages((prev) => [...prev, { ...msg, conversation_id: conversation.id }]);
-      setFileError('');
-    } catch (err) {
-      if (socket?.connected) {
-        socket.emit('send_message', { ...payload, ...apiPayload });
-        playSent();
-        setOptimisticVersion((v) => v + 1);
-        optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
-        setFileError('');
-      } else {
-        setFileError(err?.message || 'فشل الإرسال. تأكد من اتصال الإنترنت.');
-        optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
-        setOptimisticVersion((v) => v + 1);
-      }
+    } else {
+      setFileError('لا اتصال بالخادم. انتظر إعادة الاتصال.');
+      optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
+      setOptimisticVersion((v) => v + 1);
     }
   };
 
