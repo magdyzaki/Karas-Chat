@@ -391,9 +391,8 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
       }
     }
     socket?.emit('stop_typing', { conversationId: conversation.id });
-    if (socket?.connected) {
-      socket.emit('send_message', {
-        conversationId: conversation.id,
+    try {
+      const msg = await api.sendMessage(conversation.id, {
         type: payload.type,
         content: payload.content,
         file_name: payload.file_name,
@@ -405,8 +404,10 @@ export default function ChatRoom({ conversation, conversations = [], socket, cur
       playSent();
       setOptimisticVersion((v) => v + 1);
       optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
-    } else {
-      setFileError('لا اتصال بالخادم. انتظر إعادة الاتصال.');
+      if (msg) setMessages((prev) => [...prev, { ...msg, conversation_id: conversation.id }]);
+      setFileError('');
+    } catch (err) {
+      setFileError(err?.message || 'فشل الإرسال');
       optimisticRef.current = optimisticRef.current.filter((o) => o.id !== tempId);
       setOptimisticVersion((v) => v + 1);
     }

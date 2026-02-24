@@ -195,19 +195,20 @@ export async function getConversation(id) {
 
 export async function sendMessage(conversationId, { type = 'text', content, file_name, reply_to_id, reply_to_snippet, encrypted, iv }) {
   const opts = { method: 'POST', headers: headers(), body: JSON.stringify({ type, content, file_name, reply_to_id, reply_to_snippet, encrypted, iv }) };
-  let lastErr;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const path = `/api/conversations/${conversationId}/messages`;
+  let res;
+  if (typeof window !== 'undefined' && window.location?.hostname !== 'localhost') {
     try {
-      const res = await apiFetch(`/api/conversations/${conversationId}/messages`, opts);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'فشل إرسال الرسالة');
-      return data.message;
-    } catch (e) {
-      lastErr = e;
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 1500));
+      res = await fetch(BACKEND_DIRECT + path, opts);
+    } catch (_) {
+      res = await apiFetch(path, opts);
     }
+  } else {
+    res = await apiFetch(path, opts);
   }
-  throw lastErr;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'فشل إرسال الرسالة');
+  return data.message;
 }
 
 export async function getMessages(conversationId, limit = 100, before = null) {
